@@ -43,7 +43,7 @@ HYBRID_VECTOR_WEIGHT = 0.6        # 0.0 = pure BM25, 1.0 = pure vector
 HYBRID_BM25_WEIGHT = 0.4
 
 # ── Reranking ──────────────────────────────────────────────────
-RERANKER_ENABLED = True                           # Default: enabled for better results
+RERANKER_ENABLED = False                          # Disabled for CPU-only operation
 RERANKER_MODEL = "Qwen/Qwen3-Reranker-4B"        # Multilingual, high accuracy
 RERANKER_USE_FP16 = True                          # Faster inference on GPU
 RERANKER_BATCH_SIZE = 32                          # Batch size for scoring
