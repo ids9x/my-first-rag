@@ -1,0 +1,4 @@
+# Docling
+docling>=2.50
+docling-core[chunking]
+chromadb>=0.5
