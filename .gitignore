@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+
+# RAG data (don't commit PDFs or embeddings to git)
+chroma_db/
+bm25_index.pkl
+knowledge_graph/
+data/*.pdf
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
