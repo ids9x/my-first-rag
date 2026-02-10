@@ -80,10 +80,40 @@ class VectorStoreManager:
             print(f"🗑️  Deleted vector store at {self.persist_dir}")
         self._store = None
 
-    def get_retriever(self, k: int = 4, **kwargs):
-        """Convenience: return a retriever from the store."""
+    def get_retriever(self, k: int = 4, search_type: str = "similarity", **kwargs):
+        """
+        Convenience: return a retriever from the store.
+
+        Args:
+            k: Number of documents to retrieve
+            search_type: "similarity" (default) or "mmr" for diversity
+            **kwargs: Additional search parameters (e.g., fetch_k, lambda_mult for MMR)
+        """
         store = self.get_store()
-        return store.as_retriever(search_kwargs={"k": k, **kwargs})
+        return store.as_retriever(
+            search_type=search_type,
+            search_kwargs={"k": k, **kwargs}
+        )
+
+    def get_mmr_retriever(self, k: int = 4, fetch_k: int = 50, lambda_mult: float = 0.7):
+        """
+        Convenience: return an MMR retriever for diversity-aware search.
+
+        MMR (Maximal Marginal Relevance) balances relevance and diversity.
+
+        Args:
+            k: Final number of diverse documents to return
+            fetch_k: Number of candidates to fetch before MMR selection
+            lambda_mult: Relevance vs diversity (0.0-1.0)
+                1.0 = pure relevance, 0.0 = pure diversity
+                0.5-0.7 recommended for cross-jurisdictional comparison
+        """
+        return self.get_retriever(
+            k=k,
+            search_type="mmr",
+            fetch_k=fetch_k,
+            lambda_mult=lambda_mult
+        )
 
     def get_source_files(self) -> set[str]:
         """Return the set of source filenames already in the store."""

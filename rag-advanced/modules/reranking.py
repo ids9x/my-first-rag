@@ -16,6 +16,7 @@ from FlagEmbedding import FlagReranker
 from langchain_core.documents import Document
 from langchain_core.retrievers import BaseRetriever
 from langchain_core.callbacks import CallbackManagerForRetrieverRun
+from langchain_chroma import Chroma
 from config.settings import (
     RERANKER_ENABLED,
     RERANKER_MODEL,
@@ -25,6 +26,9 @@ from config.settings import (
     RERANKER_DEVICE,
     RERANKER_NORMALIZE_SCORES,
     RERANKER_CUSTOM_MODEL_PATH,
+    MMR_FETCH_K,
+    MMR_LAMBDA_MULT,
+    RETRIEVER_K,
 )
 
 
@@ -192,6 +196,121 @@ class RerankingRetriever(BaseRetriever):
         reranked_docs = self.reranker.rerank(query, initial_docs, top_k=self.top_k)
 
         return reranked_docs
+
+
+class MMRRerankingRetriever(BaseRetriever):
+    """
+    LangChain-compatible retriever that combines reranking with MMR diversity.
+
+    Pipeline:
+    1. Fetch fetch_k documents from vector store (semantic similarity)
+    2. Rerank all documents with cross-encoder (relevance scoring)
+    3. Apply MMR on reranked results (diversity selection)
+
+    This ensures final results are BOTH relevant (from reranking) AND diverse (from MMR).
+
+    Usage:
+        from config.settings import MMR_FETCH_K, MMR_LAMBDA_MULT, RETRIEVER_K
+
+        manager = VectorStoreManager()
+        reranker = Reranker.get_instance()
+        retriever = MMRRerankingRetriever(
+            vector_store=manager.get_store(),
+            reranker=reranker,
+            fetch_k=MMR_FETCH_K,
+            final_k=RETRIEVER_K,
+            lambda_mult=MMR_LAMBDA_MULT,
+        )
+        docs = retriever.invoke("Compare NQA-1 and ASME requirements")
+    """
+
+    vector_store: Chroma  # Need the actual vector store for MMR
+    reranker: Reranker
+    fetch_k: int = MMR_FETCH_K  # How many candidates to fetch and rerank
+    final_k: int = RETRIEVER_K  # How many diverse docs to return
+    lambda_mult: float = MMR_LAMBDA_MULT  # Relevance vs diversity balance
+
+    class Config:
+        arbitrary_types_allowed = True
+
+    def _get_relevant_documents(
+        self,
+        query: str,
+        *,
+        run_manager: CallbackManagerForRetrieverRun,
+    ) -> list[Document]:
+        """
+        Retrieve, rerank, then apply MMR for diversity.
+
+        Args:
+            query: User query
+            run_manager: Callback manager
+
+        Returns:
+            Final top-k diverse documents
+        """
+        # Step 1: Fetch initial candidates via similarity search
+        initial_docs = self.vector_store.similarity_search(query, k=self.fetch_k)
+
+        if not initial_docs:
+            return []
+
+        # Step 2: Rerank all candidates
+        reranked_docs = self.reranker.rerank(
+            query,
+            initial_docs,
+            top_k=self.fetch_k  # Keep all for MMR selection
+        )
+
+        # Step 3: Apply MMR on reranked results for diversity
+        # Strategy: Use document IDs from reranked results and leverage
+        # vector store's native MMR with filtering
+
+        # Extract document IDs (ChromaDB uses 'id' in metadata)
+        reranked_ids = [
+            doc.metadata.get('id') or doc.metadata.get('_id')
+            for doc in reranked_docs
+        ]
+
+        # Filter out any None IDs
+        reranked_ids = [id for id in reranked_ids if id is not None]
+
+        if not reranked_ids:
+            # Fallback: if no IDs available, just return top reranked docs
+            return reranked_docs[:self.final_k]
+
+        try:
+            # Use Chroma's native MMR but only on reranked document IDs
+            # This combines reranker scores (implicit via filtered set) with MMR diversity
+            mmr_docs = self.vector_store.max_marginal_relevance_search(
+                query=query,
+                k=self.final_k,
+                fetch_k=len(reranked_ids),
+                lambda_mult=self.lambda_mult,
+                filter={"id": {"$in": reranked_ids}}  # Only consider reranked docs
+            )
+
+            # Preserve reranker scores by merging metadata
+            # Create ID -> score mapping from reranked docs
+            score_map = {
+                (doc.metadata.get('id') or doc.metadata.get('_id')):
+                doc.metadata.get('reranker_score')
+                for doc in reranked_docs
+            }
+
+            # Add reranker scores to MMR results
+            for doc in mmr_docs:
+                doc_id = doc.metadata.get('id') or doc.metadata.get('_id')
+                if doc_id in score_map and score_map[doc_id] is not None:
+                    doc.metadata['reranker_score'] = score_map[doc_id]
+
+            return mmr_docs
+
+        except Exception as e:
+            # Fallback: if MMR fails, return top reranked docs
+            print(f"⚠️  MMR selection failed: {e}")
+            print("   Returning top reranked documents without diversity selection")
+            return reranked_docs[:self.final_k]
 
 
 def get_reranker() -> Reranker | None:

@@ -21,8 +21,8 @@ from langchain_core.output_parsers import StrOutputParser
 from core.store import VectorStoreManager
 from core.llm import get_llm
 from modules.multilingual import get_prompt
-from modules.reranking import get_reranker, RerankingRetriever
-from config.settings import RETRIEVER_K, RERANKER_FETCH_K
+from modules.reranking import get_reranker, RerankingRetriever, MMRRerankingRetriever
+from config.settings import RETRIEVER_K, RERANKER_FETCH_K, MMR_FETCH_K, MMR_LAMBDA_MULT
 
 
 def format_docs(docs):
@@ -35,17 +35,20 @@ def run_basic(manager: VectorStoreManager):
     # Get reranker if enabled
     reranker = get_reranker()
 
-    # Fetch more documents if reranking is enabled, then rerank to top k
+    # Reranking + MMR diversity (new default workflow)
     if reranker:
-        base_retriever = manager.get_retriever(k=RERANKER_FETCH_K)
-        retriever = RerankingRetriever(
-            base_retriever=base_retriever,
+        retriever = MMRRerankingRetriever(
+            vector_store=manager.get_store(),
             reranker=reranker,
-            top_k=RETRIEVER_K,
+            fetch_k=MMR_FETCH_K,
+            final_k=RETRIEVER_K,
+            lambda_mult=MMR_LAMBDA_MULT,
         )
-        print("🔄 Reranking enabled")
+        print(f"🔄 Reranking + MMR diversity enabled (fetch_k={MMR_FETCH_K}, λ={MMR_LAMBDA_MULT})")
     else:
+        # Fallback: standard vector retrieval
         retriever = manager.get_retriever(k=RETRIEVER_K)
+        print("📊 Standard vector retrieval")
 
     prompt = get_prompt()
     llm = get_llm()

@@ -43,8 +43,8 @@ HYBRID_VECTOR_WEIGHT = 0.6        # 0.0 = pure BM25, 1.0 = pure vector
 HYBRID_BM25_WEIGHT = 0.4
 
 # ── Reranking ──────────────────────────────────────────────────
-RERANKER_ENABLED = False                          # Opt-in (backward compatible)
-RERANKER_MODEL = "BAAI/bge-reranker-v2-m3"       # Multilingual cross-encoder
+RERANKER_ENABLED = True                           # Default: enabled for better results
+RERANKER_MODEL = "Qwen/Qwen3-Reranker-4B"        # Multilingual, high accuracy
 RERANKER_USE_FP16 = True                          # Faster inference on GPU
 RERANKER_BATCH_SIZE = 32                          # Batch size for scoring
 RERANKER_TOP_K = RETRIEVER_K                      # Final docs after reranking
@@ -54,6 +54,15 @@ RERANKER_NORMALIZE_SCORES = True                  # Apply sigmoid to [0,1] range
 
 # Fine-tuning support (future)
 RERANKER_CUSTOM_MODEL_PATH = None                 # Path to fine-tuned model
+
+# ── MMR Diversity Selection ────────────────────────────────────
+# When reranking is enabled, MMR is automatically applied to select
+# diverse documents from the reranked results
+MMR_LAMBDA_MULT = 0.7                             # Relevance vs diversity tradeoff
+                                                   # 1.0 = pure relevance (no diversity)
+                                                   # 0.0 = pure diversity (less relevance)
+                                                   # 0.5-0.7 recommended for cross-jurisdictional work
+MMR_FETCH_K = 50                                  # Initial candidates before reranking + MMR
 
 # ── Agentic RAG ───────────────────────────────────────────────
 MAX_AGENT_STEPS = 5               # Max reasoning steps before forcing answer
