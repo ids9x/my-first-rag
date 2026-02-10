@@ -12,7 +12,7 @@ BM25_INDEX_PATH = PROJECT_ROOT / "bm25_index.pkl"
 KNOWLEDGE_GRAPH_DIR = PROJECT_ROOT / "knowledge_graph"
 
 # ── Models (swap these when you're ready to scale) ─────────────
-CHAT_MODEL = "gemma3:4b"           # Small for testing; later: "nemotron", "qwen2.5:32b"
+CHAT_MODEL = "gemma3:4b"           # Using gemma3:4b until Ollama fixes Qwen3 MoE bug
 EMBED_MODEL = "mxbai-embed-large"  # 1024-dim, strong performance
 OLLAMA_BASE_URL = "http://localhost:11434"
 
