@@ -15,9 +15,9 @@ from pathlib import Path
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from langchain_core.documents import Document
 from core.store import VectorStoreManager
 from modules.chunking import load_directory
-from modules.multilingual import tag_documents_language
 from modules.hybrid_search import BM25Index
 from modules.knowledge_graph import KnowledgeGraph
 from config.settings import DATA_DIR
@@ -70,9 +70,6 @@ def main():
         else:
             print(f"❌ No PDFs found in {DATA_DIR}. Add PDFs and try again.")
         return
-
-    # Tag language metadata
-    chunks = tag_documents_language(chunks)
 
     # Add to vector store
     manager.add_documents(chunks)

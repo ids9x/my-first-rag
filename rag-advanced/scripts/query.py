@@ -20,7 +20,7 @@ from langchain_core.output_parsers import StrOutputParser
 
 from core.store import VectorStoreManager
 from core.llm import get_llm
-from modules.multilingual import detect_language, get_bilingual_prompt
+from modules.multilingual import get_prompt
 from config.settings import RETRIEVER_K
 
 
@@ -30,9 +30,9 @@ def format_docs(docs):
 
 
 def run_basic(manager: VectorStoreManager):
-    """Basic vector-only RAG with bilingual prompt."""
+    """Basic vector-only RAG with English prompt."""
     retriever = manager.get_retriever(k=RETRIEVER_K)
-    prompt = get_bilingual_prompt()
+    prompt = get_prompt()
     llm = get_llm()
 
     chain = (
@@ -50,8 +50,7 @@ def run_basic(manager: VectorStoreManager):
         if not question:
             continue
 
-        lang = detect_language(question)
-        print(f"   [detected: {lang}] Thinking...")
+        print("   Thinking...")
         answer = chain.invoke(question)
         print(f"\nAssistant: {answer}\n")
 
@@ -72,7 +71,7 @@ def run_hybrid(manager: VectorStoreManager):
         k=RETRIEVER_K,
     )
 
-    prompt = get_bilingual_prompt()
+    prompt = get_prompt()
     llm = get_llm()
 
     chain = (

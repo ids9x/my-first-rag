@@ -88,8 +88,7 @@ Your approach:
 2. Use keyword_search when the user references specific sections, clauses, or terms.
 3. You may call tools multiple times if the first results are insufficient.
 4. Always cite which source documents your answer comes from.
-5. If documents are in German, translate relevant parts for the user if they ask in English, and vice versa.
-6. If you cannot find enough information, say so clearly.
+5. If you cannot find enough information, say so clearly.
 
 Be precise and factual. These are regulatory documents — accuracy matters.""",
         ),

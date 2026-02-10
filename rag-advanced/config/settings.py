@@ -28,12 +28,9 @@ SECTION_SEPARATORS = [
     "\n## ",          # Markdown H2
     "\n### ",         # Markdown H3
     "\nSection ",     # "Section 2.1 ..."
-    "\nAbschnitt ",   # German: "Abschnitt 3.2 ..."
     "\nArticle ",     # "Article 5 ..."
-    "\nArtikel ",     # German
     "\nClause ",      # "Clause 4.1 ..."
     "\nAnnex ",       # "Annex A ..."
-    "\nAnhang ",      # German: Annex
     "\n\n",           # Double newline (paragraph break)
     "\n",             # Single newline
     ". ",             # Sentence boundary

@@ -1,7 +1,7 @@
 # Advanced RAG Pipeline for DGX Spark
 
 A modular, production-ready RAG system built on top of your first RAG guide.
-Designed for nuclear regulatory documents (NQA-1, ASME, IAEA standards) in German and English.
+Designed for nuclear regulatory documents (NQA-1, ASME, IAEA standards) in English.
 
 ## Architecture
 
@@ -19,7 +19,7 @@ rag-advanced/
 │   ├── __init__.py
 │   ├── chunking.py           # P2: Section-aware + recursive chunking
 │   ├── hybrid_search.py      # P3: BM25 + vector similarity fusion
-│   ├── multilingual.py       # P4: DE/EN embedding & query routing
+│   ├── multilingual.py       # P4: English prompt templates
 │   ├── agentic.py            # P5: Multi-step reasoning agents
 │   └── knowledge_graph.py    # P6: txt2kg relationship extraction
 ├── scripts/
@@ -61,7 +61,7 @@ python -m scripts.query
 | 1 | Persistent Store | ✅ Ready | Skip re-embedding on subsequent runs |
 | 2 | Chunking Strategies | ✅ Ready | Section-aware splitting for standards |
 | 3 | Hybrid Search | ✅ Ready | BM25 + vector fusion retrieval |
-| 4 | Multilingual | ✅ Ready | DE/EN document handling |
+| 4 | English Prompts | ✅ Ready | Optimized prompt templates |
 | 5 | Agentic RAG | ✅ Ready | Multi-step reasoning with tools |
 | 6 | Knowledge Graph | ✅ Ready | Relationship extraction (txt2kg) |
 
@@ -79,12 +79,15 @@ When ready to scale, just change `CHAT_MODEL` in `config/settings.py`.
 Each module can be used independently:
 
 ```python
-# Hybrid search
-python -m scripts.query --mode hybrid
+# Basic mode (vector-only retrieval)
+python -m scripts.query
 
-# Multilingual query (auto-detects language)
-python -m scripts.query --mode multilingual
+# Hybrid search (vector + BM25)
+python -m scripts.query --mode hybrid
 
 # Agentic mode (multi-step reasoning)
 python -m scripts.query --mode agentic
+
+# Knowledge graph mode
+python -m scripts.query --mode kg
 ```
