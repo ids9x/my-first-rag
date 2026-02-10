@@ -14,51 +14,20 @@ from pathlib import Path
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.runnables import RunnablePassthrough
-from langchain_core.output_parsers import StrOutputParser
-
 from core.store import VectorStoreManager
-from core.llm import get_llm
-from modules.multilingual import get_prompt
-from modules.reranking import get_reranker, RerankingRetriever, MMRRerankingRetriever
-from config.settings import RETRIEVER_K, RERANKER_FETCH_K, MMR_FETCH_K, MMR_LAMBDA_MULT
-
-
-def format_docs(docs):
-    """Format retrieved documents into context string."""
-    return "\n\n---\n\n".join(doc.page_content for doc in docs)
+from core.query_service import QueryService
+from config.settings import RERANKER_ENABLED, MMR_FETCH_K, MMR_LAMBDA_MULT
 
 
 def run_basic(manager: VectorStoreManager):
     """Basic vector-only RAG with English prompt."""
-    # Get reranker if enabled
-    reranker = get_reranker()
+    service = QueryService(manager)
 
-    # Reranking + MMR diversity (new default workflow)
-    if reranker:
-        retriever = MMRRerankingRetriever(
-            vector_store=manager.get_store(),
-            reranker=reranker,
-            fetch_k=MMR_FETCH_K,
-            final_k=RETRIEVER_K,
-            lambda_mult=MMR_LAMBDA_MULT,
-        )
+    # Show status message
+    if RERANKER_ENABLED:
         print(f"🔄 Reranking + MMR diversity enabled (fetch_k={MMR_FETCH_K}, λ={MMR_LAMBDA_MULT})")
     else:
-        # Fallback: standard vector retrieval
-        retriever = manager.get_retriever(k=RETRIEVER_K)
         print("📊 Standard vector retrieval")
-
-    prompt = get_prompt()
-    llm = get_llm()
-
-    chain = (
-        {"context": retriever | format_docs, "question": RunnablePassthrough()}
-        | prompt
-        | llm
-        | StrOutputParser()
-    )
 
     print("\n✅ Basic RAG ready. Type 'quit' to exit.\n")
     while True:
@@ -69,42 +38,23 @@ def run_basic(manager: VectorStoreManager):
             continue
 
         print("   Thinking...")
-        answer = chain.invoke(question)
-        print(f"\nAssistant: {answer}\n")
+        try:
+            result = service.query_basic(question)
+            print(f"\nAssistant: {result['answer']}\n")
+        except Exception as e:
+            print(f"\n❌ Error: {e}\n")
 
 
 def run_hybrid(manager: VectorStoreManager):
     """Hybrid vector + BM25 retrieval."""
-    from modules.hybrid_search import HybridRetriever, BM25Index
+    service = QueryService(manager)
 
-    try:
-        bm25 = BM25Index.load()
-    except FileNotFoundError:
+    if not service.bm25_index:
         print("❌ No BM25 index found. Run: python -m scripts.ingest --build-bm25")
         return
 
-    # Get reranker if enabled
-    reranker = get_reranker()
-
-    retriever = HybridRetriever(
-        vector_retriever=manager.get_retriever(k=RETRIEVER_K * 2),
-        bm25_index=bm25,
-        k=RETRIEVER_K,
-        reranker=reranker,  # Pass reranker to hybrid retriever
-    )
-
-    if reranker:
+    if RERANKER_ENABLED:
         print("🔄 Hybrid retrieval with reranking enabled")
-
-    prompt = get_prompt()
-    llm = get_llm()
-
-    chain = (
-        {"context": retriever | format_docs, "question": RunnablePassthrough()}
-        | prompt
-        | llm
-        | StrOutputParser()
-    )
 
     print("\n✅ Hybrid RAG ready (vector + BM25). Type 'quit' to exit.\n")
     while True:
@@ -115,26 +65,21 @@ def run_hybrid(manager: VectorStoreManager):
             continue
 
         print("   Thinking (hybrid search)...")
-        answer = chain.invoke(question)
-        print(f"\nAssistant: {answer}\n")
+        try:
+            result = service.query_hybrid(question)
+            print(f"\nAssistant: {result['answer']}\n")
+        except Exception as e:
+            print(f"\n❌ Error: {e}\n")
 
 
 def run_agentic(manager: VectorStoreManager):
     """Agentic RAG with tool-calling."""
-    from modules.agentic import build_agent
-    from modules.hybrid_search import BM25Index
+    service = QueryService(manager)
 
-    bm25 = None
-    try:
-        bm25 = BM25Index.load()
-    except FileNotFoundError:
+    if not service.bm25_index:
         print("⚠️  No BM25 index found — agent will only have semantic search.")
 
-    # Get reranker if enabled
-    reranker = get_reranker()
-    agent = build_agent(manager, bm25_index=bm25, reranker=reranker)
-
-    if reranker:
+    if RERANKER_ENABLED:
         print("🔄 Agentic mode with reranking enabled")
 
     print("\n✅ Agentic RAG ready. The agent will show its reasoning. Type 'quit' to exit.\n")
@@ -146,8 +91,11 @@ def run_agentic(manager: VectorStoreManager):
             continue
 
         print()
-        result = agent.invoke({"input": question})
-        print(f"\nAssistant: {result['output']}\n")
+        try:
+            result = service.query_agentic(question)
+            print(f"\nAssistant: {result['answer']}\n")
+        except Exception as e:
+            print(f"\n❌ Error: {e}\n")
 
 
 def run_kg():

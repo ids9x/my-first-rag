@@ -18,7 +18,7 @@ better agentic behavior.
 from langchain_core.tools import tool
 from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain.agents import AgentExecutor, create_tool_calling_agent
+from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
 from core.store import VectorStoreManager
 from core.llm import get_llm
 from modules.hybrid_search import BM25Index

@@ -19,3 +19,6 @@ FlagEmbedding>=1.2.0  # BGE cross-encoder reranker
 
 # Utilities
 rich>=13.0.0          # Pretty terminal output
+
+# Web interface
+gradio>=5.0.0         # Chat UI for RAG system
