@@ -1,0 +1,216 @@
+# llama-server Setup Guide
+
+## Overview
+
+Your RAG system now uses **llama.cpp server** with the **Qwen3-235B-A22B-Instruct** model (98GB, Q3_K_XL quantization) instead of Ollama. This bypasses Ollama's nil pointer bug with Qwen3 MoE models.
+
+- **Chat LLM**: llama-server (Qwen3-235B) on port 8080
+- **Embeddings**: Ollama (mxbai-embed-large) on port 11434
+- **Unified Memory**: 128GB LPDDR5x - entire model runs on GPU
+
+---
+
+## Quick Start
+
+### 1. Start llama-server
+
+```bash
+/home/ids9x/start-llama-server.sh
+```
+
+**Wait 30-60 seconds** for model loading. Watch for:
+```
+llama_model_load: loading model from ...00001-of-00003.gguf
+llama_model_load: loading model from ...00002-of-00003.gguf
+llama_model_load: loading model from ...00003-of-00003.gguf
+```
+
+Verify it's running:
+```bash
+curl http://localhost:8080/v1/models
+```
+
+### 2. Start Ollama (for embeddings)
+
+```bash
+ollama serve
+```
+
+### 3. Run Your RAG System
+
+**Web UI:**
+```bash
+cd /home/ids9x/my-first-rag/rag-advanced
+source .venv/bin/activate
+python app.py
+# Open http://localhost:7860
+```
+
+**CLI:**
+```bash
+python -m scripts.query              # Basic mode
+python -m scripts.query --mode hybrid   # Hybrid search
+python -m scripts.query --mode agentic  # Multi-step reasoning
+```
+
+---
+
+## Remote Access from Windows 11
+
+Your machine IP: **192.168.1.45**
+
+### SSH Connection
+
+**From Windows 11 Terminal/PowerShell:**
+```powershell
+ssh ids9x@192.168.1.45
+```
+
+### Access Web UI Remotely
+
+**Option 1: SSH Tunnel (Recommended)**
+```powershell
+ssh -L 7860:localhost:7860 -L 8080:localhost:8080 ids9x@192.168.1.45
+```
+
+Then open in Windows browser:
+- RAG Web UI: http://localhost:7860
+- llama-server API: http://localhost:8080/v1/models
+
+**Option 2: Direct Access (if firewall allows)**
+- RAG Web UI: http://192.168.1.45:7860
+- llama-server API: http://192.168.1.45:8080/v1/models
+
+### Remote Session Management
+
+**Start server in tmux (survives disconnect):**
+```bash
+# On the Linux machine via SSH
+tmux new -s llama-server
+/home/ids9x/start-llama-server.sh
+# Press Ctrl+B, then D to detach
+
+# Later, reattach:
+tmux attach -t llama-server
+```
+
+**Or use nohup:**
+```bash
+nohup /home/ids9x/start-llama-server.sh &
+tail -f ~/llama.cpp/llama-server.log
+```
+
+---
+
+## Server Management
+
+### Check Server Status
+
+```bash
+# llama-server
+curl http://localhost:8080/health
+
+# Ollama
+curl http://localhost:11434/api/tags
+```
+
+### Stop Servers
+
+```bash
+# Stop llama-server
+pkill -f llama-server
+
+# Stop Ollama
+pkill -f ollama
+```
+
+### View Logs
+
+```bash
+# llama-server logs
+tail -f ~/llama.cpp/llama-server.log
+
+# RAG system logs
+# (shown in terminal when running app.py or scripts/query.py)
+```
+
+### Monitor Performance
+
+```bash
+htop                # Memory usage (~98GB model + overhead)
+nvidia-smi -l 1     # GPU utilization
+free -h             # Unified memory status
+```
+
+---
+
+## Configuration Files
+
+- **LLM Config**: `~/my-first-rag/rag-advanced/config/settings.py`
+  - `CHAT_MODEL = "qwen3-235b"`
+  - `LLAMA_SERVER_BASE_URL = "http://localhost:8080/v1"`
+
+- **Startup Script**: `/home/ids9x/start-llama-server.sh`
+  - Model path: `/home/ids9x/qwen3-235b/UD-Q3_K_XL/`
+  - GPU layers: `-1` (all layers, 128GB unified memory)
+  - Context size: `8192` (increase to 16384+ if needed)
+
+---
+
+## Troubleshooting
+
+### "Cannot connect to llama-server"
+
+1. Check if server is running: `ps aux | grep llama-server`
+2. If not, start it: `/home/ids9x/start-llama-server.sh`
+3. Check logs: `tail -f ~/llama.cpp/llama-server.log`
+
+### "Cannot connect to Ollama"
+
+1. Start Ollama: `ollama serve`
+2. Verify: `curl http://localhost:11434/api/tags`
+
+### Slow First Query
+
+- Normal: Model warm-up takes 30-60s
+- Subsequent queries: 5-15s
+
+### Out of Memory
+
+- Unlikely with 128GB unified memory
+- Check: `free -h` (should have ~30GB free after loading 98GB model)
+- Reduce context if needed: Edit `start-llama-server.sh`, change `--ctx-size 8192` to `4096`
+
+### Server Won't Start
+
+1. Check if port 8080 is in use: `lsof -i :8080`
+2. Kill conflicting process: `kill <PID>`
+3. Verify model files exist: `ls -lh ~/qwen3-235b/UD-Q3_K_XL/`
+
+---
+
+## Performance Expectations
+
+- **First Query**: 30-60s (model loading)
+- **Subsequent Queries**: 5-15s
+- **Memory Usage**: ~98GB (model) + 10-20GB (context/overhead)
+- **GPU Utilization**: 100% during inference
+- **Tokens/second**: 10-50 depending on query complexity
+
+---
+
+## Key Advantages
+
+✅ **No Ollama bugs** - Bypasses nil pointer crash with Qwen3 MoE
+✅ **Full GPU acceleration** - 128GB unified memory fits entire 98GB model
+✅ **Better quality** - 235B MoE with 22B active parameters
+✅ **OpenAI-compatible API** - Works with all LangChain tools
+✅ **Persistent setup** - No re-configuration needed
+
+---
+
+## Need Help?
+
+- **View plan**: `cat ~/.claude/plans/magical-brewing-glacier.md`
+- **Server logs**: `tail -f ~/llama.cpp/llama-server.log`
+- **RAG config**: `cat ~/my-first-rag/rag-advanced/config/settings.py`
