@@ -88,7 +88,7 @@ def chat_fn(message: str, history: list, mode: str) -> str:
 
         # Provide helpful error messages
         if "connection refused" in error_msg.lower() or "connect" in error_msg.lower():
-            return "❌ **Cannot connect to Ollama.**\n\nPlease ensure Ollama is running:\n```bash\nollama serve\n```"
+            return "❌ **Cannot connect to llama-server.**\n\nPlease ensure llama-server is running:\n```bash\n/home/ids9x/start-llama-server.sh\n```"
         else:
             return f"❌ **Error:** {error_msg}"
 

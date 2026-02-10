@@ -12,7 +12,12 @@ BM25_INDEX_PATH = PROJECT_ROOT / "bm25_index.pkl"
 KNOWLEDGE_GRAPH_DIR = PROJECT_ROOT / "knowledge_graph"
 
 # ── Models (swap these when you're ready to scale) ─────────────
-CHAT_MODEL = "gemma3:4b"           # Using gemma3:4b until Ollama fixes Qwen3 MoE bug
+# Chat LLM: llama.cpp server with Qwen3-235B (OpenAI-compatible API)
+CHAT_MODEL = "qwen3-235b"                      # Model name for API calls
+LLAMA_SERVER_BASE_URL = "http://localhost:8080/v1"  # llama-server endpoint
+LLAMA_SERVER_API_KEY = "not-used"              # Required by OpenAI client but not validated
+
+# Embeddings: Still using Ollama (bug is specific to Qwen3 chat model)
 EMBED_MODEL = "mxbai-embed-large"  # 1024-dim, strong performance
 OLLAMA_BASE_URL = "http://localhost:11434"
 
