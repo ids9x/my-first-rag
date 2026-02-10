@@ -38,6 +38,7 @@ def _format_docs(docs: list[Document]) -> str:
 def build_agent(
     vector_store_manager: VectorStoreManager,
     bm25_index: BM25Index | None = None,
+    reranker=None,
 ):
     """
     Build an agentic RAG with retrieval tools.
@@ -45,11 +46,14 @@ def build_agent(
     Args:
         vector_store_manager: Initialized VectorStoreManager.
         bm25_index: Optional BM25Index for keyword search.
+        reranker: Optional Reranker for relevance scoring.
 
     Returns:
         AgentExecutor ready to invoke.
     """
-    retriever = vector_store_manager.get_retriever(k=RETRIEVER_K)
+    # Fetch more documents if reranking is enabled
+    fetch_k = RETRIEVER_K * 2 if reranker else RETRIEVER_K
+    retriever = vector_store_manager.get_retriever(k=fetch_k)
 
     @tool
     def semantic_search(query: str) -> str:
@@ -59,6 +63,11 @@ def build_agent(
         docs = retriever.invoke(query)
         if not docs:
             return "No relevant documents found."
+
+        # Apply reranking if enabled
+        if reranker:
+            docs = reranker.rerank(query, docs, top_k=RETRIEVER_K)
+
         return _format_docs(docs)
 
     @tool
@@ -69,9 +78,16 @@ def build_agent(
         Returns relevant passages from the ingested documents."""
         if bm25_index is None:
             return "Keyword search is not available (no BM25 index loaded)."
-        docs = bm25_index.search(query, k=RETRIEVER_K)
+
+        fetch_k = RETRIEVER_K * 2 if reranker else RETRIEVER_K
+        docs = bm25_index.search(query, k=fetch_k)
         if not docs:
             return "No documents matched those keywords."
+
+        # Apply reranking if enabled
+        if reranker:
+            docs = reranker.rerank(query, docs, top_k=RETRIEVER_K)
+
         return _format_docs(docs)
 
     tools = [semantic_search, keyword_search]

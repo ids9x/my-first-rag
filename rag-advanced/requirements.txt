@@ -14,5 +14,8 @@ rank-bm25>=0.2.2
 # Knowledge graph
 networkx>=3.2
 
+# Reranking
+FlagEmbedding>=1.2.0  # BGE cross-encoder reranker
+
 # Utilities
 rich>=13.0.0          # Pretty terminal output

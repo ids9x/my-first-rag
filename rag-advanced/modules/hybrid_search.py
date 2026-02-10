@@ -136,6 +136,7 @@ class HybridRetriever(BaseRetriever):
     k: int = RETRIEVER_K
     vector_weight: float = HYBRID_VECTOR_WEIGHT
     bm25_weight: float = HYBRID_BM25_WEIGHT
+    reranker: "Reranker | None" = None  # Optional reranker
 
     class Config:
         arbitrary_types_allowed = True
@@ -146,7 +147,7 @@ class HybridRetriever(BaseRetriever):
         *,
         run_manager: CallbackManagerForRetrieverRun,
     ) -> list[Document]:
-        """Retrieve using both methods, then fuse."""
+        """Retrieve using both methods, then fuse, then optionally rerank."""
         # Get results from both retrievers (fetch more than k, then fuse to k)
         fetch_k = self.k * 2
 
@@ -158,5 +159,9 @@ class HybridRetriever(BaseRetriever):
             ranked_lists=[vector_results, bm25_results],
             weights=[self.vector_weight, self.bm25_weight],
         )
+
+        # Apply reranking if enabled
+        if self.reranker:
+            return self.reranker.rerank(query, fused, top_k=self.k)
 
         return fused[: self.k]

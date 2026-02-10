@@ -21,7 +21,8 @@ from langchain_core.output_parsers import StrOutputParser
 from core.store import VectorStoreManager
 from core.llm import get_llm
 from modules.multilingual import get_prompt
-from config.settings import RETRIEVER_K
+from modules.reranking import get_reranker, RerankingRetriever
+from config.settings import RETRIEVER_K, RERANKER_FETCH_K
 
 
 def format_docs(docs):
@@ -31,7 +32,21 @@ def format_docs(docs):
 
 def run_basic(manager: VectorStoreManager):
     """Basic vector-only RAG with English prompt."""
-    retriever = manager.get_retriever(k=RETRIEVER_K)
+    # Get reranker if enabled
+    reranker = get_reranker()
+
+    # Fetch more documents if reranking is enabled, then rerank to top k
+    if reranker:
+        base_retriever = manager.get_retriever(k=RERANKER_FETCH_K)
+        retriever = RerankingRetriever(
+            base_retriever=base_retriever,
+            reranker=reranker,
+            top_k=RETRIEVER_K,
+        )
+        print("🔄 Reranking enabled")
+    else:
+        retriever = manager.get_retriever(k=RETRIEVER_K)
+
     prompt = get_prompt()
     llm = get_llm()
 
@@ -65,11 +80,18 @@ def run_hybrid(manager: VectorStoreManager):
         print("❌ No BM25 index found. Run: python -m scripts.ingest --build-bm25")
         return
 
+    # Get reranker if enabled
+    reranker = get_reranker()
+
     retriever = HybridRetriever(
         vector_retriever=manager.get_retriever(k=RETRIEVER_K * 2),
         bm25_index=bm25,
         k=RETRIEVER_K,
+        reranker=reranker,  # Pass reranker to hybrid retriever
     )
+
+    if reranker:
+        print("🔄 Hybrid retrieval with reranking enabled")
 
     prompt = get_prompt()
     llm = get_llm()
@@ -105,7 +127,12 @@ def run_agentic(manager: VectorStoreManager):
     except FileNotFoundError:
         print("⚠️  No BM25 index found — agent will only have semantic search.")
 
-    agent = build_agent(manager, bm25_index=bm25)
+    # Get reranker if enabled
+    reranker = get_reranker()
+    agent = build_agent(manager, bm25_index=bm25, reranker=reranker)
+
+    if reranker:
+        print("🔄 Agentic mode with reranking enabled")
 
     print("\n✅ Agentic RAG ready. The agent will show its reasoning. Type 'quit' to exit.\n")
     while True:
