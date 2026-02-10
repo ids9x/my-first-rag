@@ -76,6 +76,6 @@ KG_MAX_TRIPLES_PER_CHUNK = 10
 DEFAULT_COLLECTION = "documents"
 
 # ── Web Interface ──────────────────────────────────────────────
-WEB_HOST = "127.0.0.1"       # Localhost only; use "0.0.0.0" for network access
+WEB_HOST = "0.0.0.0"         # Listen on all network interfaces (accessible from network)
 WEB_PORT = 7860              # Gradio default
 WEB_SHARE = False            # Set True to create public Gradio link
