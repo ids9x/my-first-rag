@@ -13,7 +13,7 @@ KNOWLEDGE_GRAPH_DIR = PROJECT_ROOT / "knowledge_graph"
 
 # ── Models (swap these when you're ready to scale) ─────────────
 CHAT_MODEL = "gemma3:4b"           # Small for testing; later: "nemotron", "qwen2.5:32b"
-EMBED_MODEL = "nomic-embed-text"   # 768-dim, good multilingual support
+EMBED_MODEL = "mxbai-embed-large"  # 1024-dim, strong performance
 OLLAMA_BASE_URL = "http://localhost:11434"
 
 # ── Chunking ───────────────────────────────────────────────────
