@@ -121,8 +121,8 @@ def create_interface():
 
     # Create Gradio interface with Blocks for custom layout
     with gr.Blocks(title="RAG System") as demo:
-        gr.Markdown("# 🔬 Nuclear Regulatory RAG System")
-        gr.Markdown("Ask questions about nuclear standards and regulations (NQA-1, ASME, etc.)")
+        gr.Markdown("# 🔬 Nuclear RAG System")
+        gr.Markdown("Ask questions about the document corpus")
 
         # Status panel (collapsible)
         with gr.Accordion("📊 System Status", open=False):
@@ -144,25 +144,15 @@ def create_interface():
         chatbot = gr.Chatbot(label="Chat", height=400)
         msg = gr.Textbox(
             label="Message",
-            placeholder="Ask a question about nuclear regulations...",
-            lines=2,
-            max_lines=5
+            placeholder="Ask a question about the document corpus...",
+            lines=1,
+            max_lines=5,
+            submit_btn=True
         )
 
         with gr.Row():
             submit = gr.Button("Submit", variant="primary")
             clear = gr.Button("Clear")
-
-        # Example questions
-        gr.Examples(
-            examples=[
-                "What are the QA requirements for nuclear facilities?",
-                "Explain NQA-1 Section 18",
-                "What is the difference between QA Level 1 and Level 2?",
-                "How are auditors qualified according to the standard?"
-            ],
-            inputs=msg
-        )
 
         # Connect components
         submit.click(respond, [msg, chatbot, mode], [chatbot, msg])
