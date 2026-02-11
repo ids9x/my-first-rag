@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 # Add project root to path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from langchain_core.documents import Document
 from core.store import VectorStoreManager

@@ -3,12 +3,16 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .venv/
+ingest_test/.venv/
 
 # RAG data (don't commit PDFs or embeddings to git)
 chroma_db/
 bm25_index.pkl
 knowledge_graph/
 data/*.pdf
+
+# Archive
+archive/prototype/chroma_db/
 
 # OS
 .DS_Store

@@ -29,7 +29,7 @@ python -m scripts.ingest --build-bm25
 
 ### 2. Start the Web Interface
 
-From the `rag-advanced` directory, run:
+From the project root directory, run:
 
 ```bash
 python app.py

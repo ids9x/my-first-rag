@@ -40,7 +40,7 @@ ollama serve
 
 **Web UI:**
 ```bash
-cd /home/ids9x/my-first-rag/rag-advanced
+cd /home/ids9x/my-first-rag
 source .venv/bin/activate
 python app.py
 # Open http://localhost:7860
@@ -146,7 +146,7 @@ free -h             # Unified memory status
 
 ## Configuration Files
 
-- **LLM Config**: `~/my-first-rag/rag-advanced/config/settings.py`
+- **LLM Config**: `~/my-first-rag/config/settings.py`
   - `CHAT_MODEL = "qwen3-235b"`
   - `LLAMA_SERVER_BASE_URL = "http://localhost:8080/v1"`
 
@@ -213,4 +213,4 @@ free -h             # Unified memory status
 
 - **View plan**: `cat ~/.claude/plans/magical-brewing-glacier.md`
 - **Server logs**: `tail -f ~/llama.cpp/llama-server.log`
-- **RAG config**: `cat ~/my-first-rag/rag-advanced/config/settings.py`
+- **RAG config**: `cat ~/my-first-rag/config/settings.py`

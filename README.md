@@ -7,6 +7,7 @@ A modular, production-ready Retrieval-Augmented Generation (RAG) system designed
 ## 📋 Table of Contents
 
 - [Quick Start](#-quick-start)
+- [Project Structure](#-project-structure)
 - [User Guide](#-users-guide)
 - [Query Workflows](#-query-workflows)
 - [Configuration Guide](#-configuration-guide)
@@ -24,7 +25,7 @@ A modular, production-ready Retrieval-Augmented Generation (RAG) system designed
 
 \`\`\`bash
 # Activate your virtual environment
-cd ~/my-first-rag/rag-advanced
+cd ~/my-first-rag
 source .venv/bin/activate  # or: .venv\Scripts\activate on Windows
 
 # Verify Ollama is running
@@ -69,6 +70,43 @@ python -m scripts.query
 # Or try hybrid mode (vector + keyword search)
 python -m scripts.query --mode hybrid
 \`\`\`
+
+---
+
+## 🗂️ Project Structure
+
+```
+my-first-rag/
+├── .venv/              # Single virtual environment (5.2GB)
+├── config/             # Configuration and settings
+│   └── settings.py     # Central configuration file
+├── core/               # Core RAG components
+│   ├── embeddings.py   # Embedding setup
+│   ├── llm.py          # LLM configuration
+│   ├── query_service.py # Main query interface
+│   └── store.py        # Vector store management
+├── modules/            # Feature modules
+│   ├── agentic.py      # Multi-step reasoning
+│   ├── chunking.py     # Document chunking strategies
+│   ├── hybrid_search.py # Vector + BM25 hybrid search
+│   ├── knowledge_graph.py # Knowledge graph extraction
+│   ├── multilingual.py # Multilingual support
+│   └── reranking.py    # Cross-encoder reranking
+├── scripts/            # CLI scripts
+│   ├── ingest.py       # Document ingestion
+│   ├── query.py        # Query interface
+│   └── reset_store.py  # Reset vector store
+├── data/               # Your PDF documents
+├── chroma_db/          # Vector database (generated)
+├── bm25_index.pkl      # BM25 index (generated)
+├── app.py              # Gradio web interface
+├── requirements.txt    # Python dependencies
+├── archive/
+│   └── prototype/      # Original rag.py (archived)
+└── ingest_test/        # ⚠️ Experimental (requires separate venv)
+```
+
+**Note**: `ingest_test/` requires its own virtual environment due to dependency conflicts. See [ingest_test/README.md](ingest_test/README.md).
 
 ---
 
@@ -374,7 +412,6 @@ AGENT_TEMPERATURE = 0.1      # Low = factual, High = creative
 ### Project Structure
 
 ```
-rag-advanced/
 ├── config/
 │   └── settings.py          # 🎛️ All configuration here
 ├── core/
