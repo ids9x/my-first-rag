@@ -17,6 +17,7 @@ Why this matters for nuclear docs:
 """
 import pickle
 from pathlib import Path
+from typing import TYPE_CHECKING
 from rank_bm25 import BM25Okapi
 from langchain_core.documents import Document
 from langchain_core.retrievers import BaseRetriever
@@ -27,6 +28,9 @@ from config.settings import (
     HYBRID_BM25_WEIGHT,
     BM25_INDEX_PATH,
 )
+
+if TYPE_CHECKING:
+    from modules.reranking import Reranker
 
 
 class BM25Index:
@@ -138,8 +142,7 @@ class HybridRetriever(BaseRetriever):
     bm25_weight: float = HYBRID_BM25_WEIGHT
     reranker: "Reranker | None" = None  # Optional reranker
 
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = {"arbitrary_types_allowed": True}
 
     def _get_relevant_documents(
         self,
@@ -165,3 +168,12 @@ class HybridRetriever(BaseRetriever):
             return self.reranker.rerank(query, fused, top_k=self.k)
 
         return fused[: self.k]
+
+
+# Rebuild the model to resolve forward references
+# This is needed because Reranker is defined in a separate module
+try:
+    from modules.reranking import Reranker
+    HybridRetriever.model_rebuild()
+except ImportError:
+    pass  # Reranker not available, but HybridRetriever will still work without it
