@@ -40,13 +40,25 @@ cp /path/to/your/*.pdf data/
 
 ### 3. Ingest Documents
 
+**Option A: All-in-one (Recommended)**
 \`\`\`bash
-# First time: Create vector store
-python -m scripts.ingest
-
-# Optional: Build BM25 index for hybrid search
-python -m scripts.ingest --build-bm25
+# Create vector store + BM25 index in one command
+python -m scripts.ingest --strategy section --build-bm25
 \`\`\`
+
+**Option B: Step-by-step**
+\`\`\`bash
+# Step 1: Create vector store with section-aware chunking
+python -m scripts.ingest --strategy section
+
+# Step 2: Build BM25 index for hybrid search
+# ⚠️ IMPORTANT: Must specify same strategy to avoid duplicate chunks
+python -m scripts.ingest --build-bm25 --strategy section
+\`\`\`
+
+> **💡 Why section strategy?** For regulatory documents (NQA-1, ASME), section-aware chunking respects document structure (Section, Article, Clause, Annex) for more coherent retrieval.
+
+> **⚠️ Known Issue**: If you run `--build-bm25` without specifying `--strategy`, it will default to `recursive` and re-chunk documents differently, creating duplicates. Always specify the strategy explicitly or use Option A.
 
 ### 4. Start Querying
 
@@ -414,8 +426,7 @@ chromadb.errors.InvalidArgumentError: Collection expecting embedding with dimens
 ```bash
 # Reset and rebuild with new embeddings
 python -m scripts.reset_store
-python -m scripts.ingest
-python -m scripts.ingest --build-bm25  # If using hybrid mode
+python -m scripts.ingest --strategy section --build-bm25
 ```
 
 ---
@@ -428,7 +439,41 @@ python -m scripts.ingest --build-bm25  # If using hybrid mode
 
 **Solution:**
 ```bash
-python -m scripts.ingest --build-bm25
+# Build BM25 index from existing chunks
+# ⚠️ Must match the chunking strategy used during initial ingestion
+python -m scripts.ingest --build-bm25 --strategy section
+
+# Or if you used default recursive strategy:
+python -m scripts.ingest --build-bm25 --strategy recursive
+```
+
+---
+
+### Issue: Duplicate Chunks in Vector Store
+
+**Symptom:** After running `--build-bm25`, your chunk count increased unexpectedly:
+```
+First run:  446 chunks (strategy: section)
+Second run: 679 chunks (added 233 more with strategy: recursive)
+```
+
+**Cause:** Ran `--build-bm25` without specifying `--strategy`, causing documents to be re-chunked with default `recursive` strategy and added as duplicates.
+
+**How to check:**
+```bash
+# Check your vector store size
+python -c "from core.store import VectorStoreManager; m = VectorStoreManager(); print(f'Total chunks: {len(m.get_store().get()[\"ids\"])}')"
+```
+
+**Solution: Reset and re-ingest**
+```bash
+# 1. Clear duplicate chunks
+python -m scripts.reset_store
+
+# 2. Re-ingest with single strategy (all-in-one approach)
+python -m scripts.ingest --strategy section --build-bm25
+
+# Now you have clean chunks ready for vector/hybrid/agentic modes ✅
 ```
 
 ---
@@ -480,7 +525,8 @@ RERANKER_BATCH_SIZE = 8  # Down from 32
 
 1. **Enable hybrid search:**
 ```bash
-python -m scripts.ingest --build-bm25
+# Build BM25 index (match your chunking strategy)
+python -m scripts.ingest --build-bm25 --strategy section
 python -m scripts.query --mode hybrid
 ```
 
@@ -613,15 +659,18 @@ for query in queries:
 
 | Task | Command |
 |------|---------|
-| Initial setup | `python -m scripts.ingest` |
-| Add BM25 index | `python -m scripts.ingest --build-bm25` |
+| Initial setup (vector + BM25) | `python -m scripts.ingest --strategy section --build-bm25` |
+| Initial setup (vector only) | `python -m scripts.ingest --strategy section` |
+| Add BM25 to existing store | `python -m scripts.ingest --build-bm25 --strategy section` ⚠️ |
 | Basic query | `python -m scripts.query` |
-| Hybrid query | `python -m scripts.query --mode hybrid` |
+| Hybrid query (needs BM25) | `python -m scripts.query --mode hybrid` |
 | Agentic query | `python -m scripts.query --mode agentic` |
 | KG query | `python -m scripts.query --mode kg` |
 | Reset database | `python -m scripts.reset_store` |
-| Change embedding model | Edit `config/settings.py` → `EMBED_MODEL` |
+| Change embedding model | Edit `config/settings.py` → `EMBED_MODEL` → Reset & re-ingest |
 | Enable reranking | Edit `config/settings.py` → `RERANKER_ENABLED = True` |
+
+> ⚠️ When adding BM25 to an existing store, **always specify the same chunking strategy** used during initial ingestion to avoid duplicate chunks.
 
 ---
 
