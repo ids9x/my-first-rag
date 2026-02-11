@@ -107,6 +107,18 @@ def create_interface():
     status_lines.append(f"**Reranker:** {'✅ Enabled' if status['reranker_enabled'] else '❌ Disabled'}")
     status_md = "\n\n".join(status_lines)
 
+    # Helper function for chat interactions
+    def respond(message, chat_history, query_mode):
+        """Handle user message and update chat history."""
+        if not message.strip():
+            return chat_history, ""
+
+        response = chat_fn(message, chat_history, query_mode)
+        # Use Gradio 6.x message format
+        chat_history.append({"role": "user", "content": message})
+        chat_history.append({"role": "assistant", "content": response})
+        return chat_history, ""
+
     # Create Gradio interface with Blocks for custom layout
     with gr.Blocks(title="RAG System") as demo:
         gr.Markdown("# 🔬 Nuclear Regulatory RAG System")
@@ -128,16 +140,34 @@ def create_interface():
             info="Basic: Semantic search | Hybrid: Vector + keywords | Agentic: Multi-step reasoning"
         )
 
-        # Chat interface
-        chatbot = gr.ChatInterface(
-            fn=lambda msg, hist: chat_fn(msg, hist, mode.value),
+        # Chat components (manual implementation for proper integration)
+        chatbot = gr.Chatbot(label="Chat", height=400)
+        msg = gr.Textbox(
+            label="Message",
+            placeholder="Ask a question about nuclear regulations...",
+            lines=2,
+            max_lines=5
+        )
+
+        with gr.Row():
+            submit = gr.Button("Submit", variant="primary")
+            clear = gr.Button("Clear")
+
+        # Example questions
+        gr.Examples(
             examples=[
                 "What are the QA requirements for nuclear facilities?",
                 "Explain NQA-1 Section 18",
                 "What is the difference between QA Level 1 and Level 2?",
                 "How are auditors qualified according to the standard?"
             ],
+            inputs=msg
         )
+
+        # Connect components
+        submit.click(respond, [msg, chatbot, mode], [chatbot, msg])
+        msg.submit(respond, [msg, chatbot, mode], [chatbot, msg])
+        clear.click(lambda: ([], ""), None, [chatbot, msg], queue=False)
 
     return demo
 
