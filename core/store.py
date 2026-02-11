@@ -63,11 +63,26 @@ class VectorStoreManager:
 
         return self._store
 
-    def add_documents(self, documents: list[Document]) -> None:
-        """Add documents to the store (embeds and persists automatically)."""
+    def add_documents(self, documents: list[Document], batch_size: int = 100) -> None:
+        """
+        Add documents to the store in batches (embeds and persists automatically).
+
+        Args:
+            documents: List of documents to add
+            batch_size: Number of documents to process per batch (default: 100)
+        """
         store = self.get_store()
-        print(f"➕ Adding {len(documents)} chunks to the store...")
-        store.add_documents(documents)
+        total = len(documents)
+        print(f"➕ Adding {total} chunks to the store in batches of {batch_size}...")
+
+        # Process in batches to avoid overwhelming the embedding server
+        for i in range(0, total, batch_size):
+            batch = documents[i:i + batch_size]
+            batch_num = (i // batch_size) + 1
+            total_batches = (total + batch_size - 1) // batch_size
+            print(f"   Processing batch {batch_num}/{total_batches} ({len(batch)} chunks)...")
+            store.add_documents(batch)
+
         count = store._collection.count()
         print(f"   Store now contains {count} total chunks.")
 
