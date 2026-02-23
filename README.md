@@ -28,8 +28,15 @@ A modular, production-ready Retrieval-Augmented Generation (RAG) system designed
 cd ~/my-first-rag
 source .venv/bin/activate  # or: .venv\Scripts\activate on Windows
 
-# Verify Ollama is running
+# Verify Ollama is running and has the embedding model
 curl http://localhost:11434/api/tags
+# Should list "mxbai-embed-large" in the output
+
+# If Ollama is not running, start it:
+ollama serve &
+
+# If embedding model is missing, pull it:
+ollama pull mxbai-embed-large
 \`\`\`
 
 ### 2. Add Your Documents
@@ -60,6 +67,21 @@ python -m scripts.ingest --build-bm25 --strategy section
 > **💡 Why section strategy?** For regulatory documents (NQA-1, ASME), section-aware chunking respects document structure (Section, Article, Clause, Annex) for more coherent retrieval.
 
 > **⚠️ Known Issue**: If you run `--build-bm25` without specifying `--strategy`, it will default to `recursive` and re-chunk documents differently, creating duplicates. Always specify the strategy explicitly or use Option A.
+
+### Full Reset & Rebuild
+
+If you need to start fresh (new documents, changed settings, or corrupted store):
+
+\`\`\`bash
+# 1. Reset everything (vector store + BM25 index + knowledge graph)
+python -m scripts.reset_store --all
+
+# 2. Re-ingest from current data/ contents
+python -m scripts.ingest --strategy section --build-bm25
+
+# 3. Verify chunk count
+python -c "from core.store import VectorStoreManager; m = VectorStoreManager(); print(f'Total chunks: {m.get_store()._collection.count()}')"
+\`\`\`
 
 ### 4. Start Querying
 
@@ -316,7 +338,7 @@ CHAT_MODEL = "gemma3:4b"  # Options: gemma3:4b, qwen2.5:32b, llama3.1:70b
 # Embedding model (for vector search)
 EMBED_MODEL = "mxbai-embed-large"  # 1024-dim, high performance
 
-# Ollama server
+# Ollama server (for embeddings)
 OLLAMA_BASE_URL = "http://localhost:11434"
 ```
 
@@ -450,6 +472,33 @@ AGENT_TEMPERATURE = 0.1      # Low = factual, High = creative
 ---
 
 ## 🔧 Troubleshooting
+
+### Issue: Ollama Not Running / Connection Refused
+
+**Symptom:** Errors like `ConnectionError`, `Connection refused`, or embedding failures during ingestion.
+
+**Diagnose:**
+\`\`\`bash
+# Check if Ollama is running
+curl http://localhost:11434/api/tags
+
+# Check if the embedding model is available
+curl http://localhost:11434/api/tags | python3 -c "import sys,json; models=[m['name'] for m in json.load(sys.stdin)['models']]; print('mxbai-embed-large:', 'FOUND' if any('mxbai-embed-large' in m for m in models) else 'MISSING')"
+\`\`\`
+
+**Solution:**
+\`\`\`bash
+# Start Ollama if not running
+ollama serve &
+
+# Pull the embedding model if missing
+ollama pull mxbai-embed-large
+
+# Verify it works
+curl http://localhost:11434/api/tags
+\`\`\`
+
+---
 
 ### Issue: Dimension Mismatch Error
 

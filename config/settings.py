@@ -17,10 +17,9 @@ CHAT_MODEL = "qwen3-235b"                      # Model name for API calls
 LLAMA_SERVER_BASE_URL = "http://localhost:8080/v1"  # llama-server endpoint
 LLAMA_SERVER_API_KEY = "not-used"              # Required by OpenAI client but not validated
 
-# Embeddings: Using project-specific Ollama instance (CPU-only on port 11435)
-# Run ./start-ollama-cpu.sh to start the CPU-only instance
+# Embeddings: Ollama instance for embedding model
 EMBED_MODEL = "mxbai-embed-large"
-OLLAMA_BASE_URL = "http://localhost:11435"  # Project-specific CPU-only instance
+OLLAMA_BASE_URL = "http://localhost:11434"
 
 # ── Chunking ───────────────────────────────────────────────────
 # Default recursive chunking
