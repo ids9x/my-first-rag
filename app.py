@@ -8,7 +8,7 @@ Then open http://127.0.0.1:7860 in your browser.
 """
 import gradio as gr
 from core.query_service import QueryService
-from config.settings import WEB_HOST, WEB_PORT, WEB_SHARE
+from config.settings import WEB_HOST, WEB_PORT, WEB_SHARE, CHAT_MODEL, EMBED_MODEL
 
 # Initialize query service globally
 query_service = QueryService()
@@ -105,6 +105,8 @@ def create_interface():
                        f"({status['vector_store_count']} chunks)")
     status_lines.append(f"**BM25 Index:** {'✅' if status['bm25_exists'] else '❌'}")
     status_lines.append(f"**Reranker:** {'✅ Enabled' if status['reranker_enabled'] else '❌ Disabled'}")
+    status_lines.append(f"**Chat Model:** `{CHAT_MODEL}`")
+    status_lines.append(f"**Embedding Model:** `{EMBED_MODEL}`")
     status_md = "\n\n".join(status_lines)
 
     # Helper function for chat interactions

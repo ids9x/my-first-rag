@@ -19,7 +19,7 @@ A modular, production-ready Retrieval-Augmented Generation (RAG) system designed
 
 ## 🚀 Quick Start
 
-> **Prerequisites**: Python 3.10+, Ollama installed and running
+> **Prerequisites**: Python 3.10+, Ollama installed and running, llama-server (llama.cpp) for chat
 
 ### 1. Initial Setup (One-time)
 
@@ -39,14 +39,28 @@ ollama serve &
 ollama pull mxbai-embed-large
 \`\`\`
 
-### 2. Add Your Documents
+### 2. Start the Chat LLM Server
+
+The chat model runs via llama-server (llama.cpp), separate from Ollama. Start it in a **separate terminal**:
+
+\`\`\`bash
+/home/ids9x/start-llama-server.sh
+# Wait until you see "listening on 0.0.0.0:8080"
+
+# Verify it's running:
+curl http://localhost:8080/v1/models
+\`\`\`
+
+> **Note:** Ollama handles embeddings (port 11434). llama-server handles chat generation (port 8080). Both must be running to use the system.
+
+### 3. Add Your Documents
 
 \`\`\`bash
 # Place your PDF documents in the data/ folder
 cp /path/to/your/*.pdf data/
 \`\`\`
 
-### 3. Ingest Documents
+### 4. Ingest Documents
 
 **Option A: All-in-one (Recommended)**
 \`\`\`bash
@@ -83,8 +97,15 @@ python -m scripts.ingest --strategy section --build-bm25
 python -c "from core.store import VectorStoreManager; m = VectorStoreManager(); print(f'Total chunks: {m.get_store()._collection.count()}')"
 \`\`\`
 
-### 4. Start Querying
+### 5. Start Querying
 
+**Option A: Web UI (Gradio)**
+\`\`\`bash
+python app.py
+# Opens at http://127.0.0.1:7860
+\`\`\`
+
+**Option B: Terminal**
 \`\`\`bash
 # Basic mode (vector search only)
 python -m scripts.query
