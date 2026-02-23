@@ -41,17 +41,23 @@ ollama pull mxbai-embed-large
 
 ### 2. Start the Chat LLM Server
 
-The chat model runs via llama-server (llama.cpp), separate from Ollama. Start it in a **separate terminal**:
+The chat model (Qwen3-235B) runs via **llama-server** (llama.cpp), which is separate from Ollama. Open a **separate terminal** and run:
 
 \`\`\`bash
-/home/ids9x/start-llama-server.sh
-# Wait until you see "listening on 0.0.0.0:8080"
+# Start llama-server (loads the Qwen3-235B model onto GPU)
+~/start-llama-server.sh
+# Wait until you see "listening on 0.0.0.0:8080" before proceeding
 
-# Verify it's running:
+# In another terminal, verify it's running:
 curl http://localhost:8080/v1/models
 \`\`\`
 
-> **Note:** Ollama handles embeddings (port 11434). llama-server handles chat generation (port 8080). Both must be running to use the system.
+> **Architecture:** This system uses two servers that must both be running:
+>
+> | Server | Port | Purpose | Start command |
+> |--------|------|---------|---------------|
+> | Ollama | 11434 | Embeddings (`mxbai-embed-large`) | `ollama serve` |
+> | llama-server | 8080 | Chat LLM (`qwen3-235b` via llama.cpp) | `~/start-llama-server.sh` |
 
 ### 3. Add Your Documents
 
@@ -112,6 +118,18 @@ python -m scripts.query
 
 # Or try hybrid mode (vector + keyword search)
 python -m scripts.query --mode hybrid
+\`\`\`
+
+### 6. Shutting Down
+
+\`\`\`bash
+# Stop the Gradio web UI: press Ctrl+C in its terminal
+
+# Stop llama-server (frees VRAM):
+pkill -f llama-server
+
+# Verify VRAM is freed:
+nvidia-smi
 \`\`\`
 
 ---
