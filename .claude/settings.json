@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Read(//home/ids9x/**)"
+      "Read(//home/ids9x/**)",
+      "Bash(git add:*)",
+      "Bash(sudo systemctl restart:*)"
     ]
   }
 }

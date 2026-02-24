@@ -7,8 +7,69 @@ Launch with:
 Then open http://127.0.0.1:7860 in your browser.
 """
 import gradio as gr
+from gradio.themes.utils import fonts
 from core.query_service import QueryService
 from config.settings import WEB_HOST, WEB_PORT, WEB_SHARE, CHAT_MODEL, EMBED_MODEL
+
+
+def build_theme() -> gr.themes.Base:
+    """Build a dark high-contrast theme with Inter font for readability."""
+    return gr.themes.Base(
+        primary_hue=gr.themes.colors.cyan,
+        secondary_hue=gr.themes.colors.blue,
+        neutral_hue=gr.themes.colors.gray,
+        text_size=gr.themes.sizes.text_lg,
+        font=[
+            fonts.GoogleFont("Inter"),
+            "ui-sans-serif",
+            "system-ui",
+            "sans-serif",
+        ],
+        font_mono=[
+            fonts.GoogleFont("JetBrains Mono"),
+            "ui-monospace",
+            "Consolas",
+            "monospace",
+        ],
+    ).set(
+        # --- Dark background ---
+        body_background_fill="#0f1117",
+        body_background_fill_dark="#0f1117",
+        background_fill_primary="#1a1d27",
+        background_fill_primary_dark="#1a1d27",
+        background_fill_secondary="#232734",
+        background_fill_secondary_dark="#232734",
+        # --- High-contrast text ---
+        body_text_color="#e8eaed",
+        body_text_color_dark="#e8eaed",
+        body_text_color_subdued="#9aa0a6",
+        body_text_color_subdued_dark="#9aa0a6",
+        # --- Borders and inputs ---
+        border_color_primary="#3c4043",
+        border_color_primary_dark="#3c4043",
+        input_background_fill="#232734",
+        input_background_fill_dark="#232734",
+        input_border_color="#3c4043",
+        input_border_color_dark="#3c4043",
+        # --- Buttons ---
+        button_primary_background_fill="#00bcd4",
+        button_primary_background_fill_dark="#00bcd4",
+        button_primary_text_color="#000000",
+        button_primary_text_color_dark="#000000",
+        button_secondary_background_fill="#2d3240",
+        button_secondary_background_fill_dark="#2d3240",
+        button_secondary_text_color="#e8eaed",
+        button_secondary_text_color_dark="#e8eaed",
+        # --- Blocks (panels, accordions) ---
+        block_background_fill="#1a1d27",
+        block_background_fill_dark="#1a1d27",
+        block_border_color="#3c4043",
+        block_border_color_dark="#3c4043",
+        block_label_text_color="#e8eaed",
+        block_label_text_color_dark="#e8eaed",
+        block_title_text_color="#e8eaed",
+        block_title_text_color_dark="#e8eaed",
+    )
 
 # Initialize query service globally
 query_service = QueryService()
@@ -211,8 +272,34 @@ def create_interface():
             chat_history.append({"role": "assistant", "content": msg})
             yield chat_history, ""
 
+    # JavaScript to update font size on the chat and message areas dynamically.
+    # Targets the chatbot messages and input textbox via their elem_id.
+    font_size_js = """
+    (size) => {
+        const px = size + 'px';
+        document.documentElement.style.setProperty('--chat-font-size', px);
+        const style = document.getElementById('dynamic-font-style');
+        if (style) {
+            style.textContent = `
+                #rag-chatbot .message-bubble-border { font-size: ${px} !important; }
+                #rag-chatbot .message-bubble-border * { font-size: inherit !important; }
+                #rag-msg textarea { font-size: ${px} !important; }
+            `;
+        }
+        return size;
+    }
+    """
+
     # Create Gradio interface with Blocks for custom layout
-    with gr.Blocks(title="RAG System") as demo:
+    with gr.Blocks(
+        title="RAG System",
+        css="""
+            #rag-chatbot .message-bubble-border { font-size: 16px; }
+            #rag-chatbot .message-bubble-border * { font-size: inherit; }
+            #rag-msg textarea { font-size: 16px; }
+        """,
+        head='<style id="dynamic-font-style"></style>',
+    ) as demo:
         gr.Markdown("# 🔬 Nuclear RAG System")
         gr.Markdown("Ask questions about the document corpus")
 
@@ -291,19 +378,45 @@ def create_interface():
                 "displacement?\"*\n"
             )
 
-        # Chat components (manual implementation for proper integration)
-        chatbot = gr.Chatbot(label="Chat", height=400)
+        # Chat components
+        chatbot = gr.Chatbot(label="Chat", height=500, elem_id="rag-chatbot")
         msg = gr.Textbox(
             label="Message",
             placeholder="Ask a question about the document corpus...",
             lines=1,
             max_lines=5,
-            submit_btn=True
+            submit_btn=True,
+            elem_id="rag-msg",
         )
 
         with gr.Row():
             submit = gr.Button("Submit", variant="primary")
             clear = gr.Button("Clear")
+
+        # Example questions the user can click to auto-fill
+        gr.Examples(
+            examples=[
+                "What is the definition of significant environmental impact?",
+                "Compare the air quality and noise mitigation measures",
+                "List all monitoring requirements specified in the reports",
+                "What are the key findings regarding water quality impacts?",
+            ],
+            inputs=msg,
+            label="Example Questions",
+        )
+
+        # Display settings (collapsible)
+        with gr.Accordion("Display Settings", open=False):
+            font_slider = gr.Slider(
+                minimum=12,
+                maximum=24,
+                value=16,
+                step=1,
+                label="Chat Font Size (px)",
+                info="Adjust the text size in the chat and message areas",
+            )
+            font_slider.change(fn=None, inputs=font_slider, outputs=font_slider,
+                               js=font_size_js)
 
         # Connect components
         submit.click(respond, [msg, chatbot, mode], [chatbot, msg])
@@ -325,5 +438,5 @@ if __name__ == "__main__":
         server_name=WEB_HOST,
         server_port=WEB_PORT,
         share=WEB_SHARE,
-        theme=gr.themes.Soft(),
+        theme=build_theme(),
     )
