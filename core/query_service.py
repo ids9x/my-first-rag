@@ -110,6 +110,21 @@ class QueryService:
             })
         return sources
 
+    def _ensure_basic_chain(self):
+        """Build basic chain if not cached."""
+        if self._basic_chain is None:
+            retriever = self._get_retriever_with_reranking()
+            prompt = get_prompt()
+            llm = get_llm()
+
+            self._basic_chain = (
+                {"context": retriever | format_docs, "question": RunnablePassthrough()}
+                | prompt
+                | llm
+                | StrOutputParser()
+            )
+            self._basic_retriever = retriever
+
     def query_basic(self, question: str) -> dict:
         """
         Execute basic vector search query.
@@ -126,19 +141,7 @@ class QueryService:
         if not self.manager.exists:
             raise ValueError("Vector store not found. Run: python -m scripts.ingest")
 
-        # Build chain if not cached
-        if self._basic_chain is None:
-            retriever = self._get_retriever_with_reranking()
-            prompt = get_prompt()
-            llm = get_llm()
-
-            self._basic_chain = (
-                {"context": retriever | format_docs, "question": RunnablePassthrough()}
-                | prompt
-                | llm
-                | StrOutputParser()
-            )
-            self._basic_retriever = retriever
+        self._ensure_basic_chain()
 
         # Execute query
         answer = self._basic_chain.invoke(question)
@@ -153,26 +156,35 @@ class QueryService:
             "mode": "basic",
         }
 
-    def query_hybrid(self, question: str) -> dict:
+    def query_basic_stream(self, question: str):
         """
-        Execute hybrid (vector + BM25) search query.
+        Stream basic vector search query token by token.
 
-        Args:
-            question: User question
-
-        Returns:
-            dict with:
-                - answer: str
-                - sources: list[dict]
-                - mode: "hybrid"
+        Yields partial answer strings, then yields the final dict with sources.
         """
         if not self.manager.exists:
             raise ValueError("Vector store not found. Run: python -m scripts.ingest")
 
+        self._ensure_basic_chain()
+
+        # Stream tokens
+        answer = ""
+        for chunk in self._basic_chain.stream(question):
+            answer += chunk
+            yield {"partial": answer, "mode": "basic"}
+
+        # Append sources at the end
+        docs = self._basic_retriever.invoke(question)
+        sources = self._extract_sources(docs)
+        yield {"answer": answer, "sources": sources, "mode": "basic"}
+
+    def _ensure_hybrid_chain(self):
+        """Build hybrid chain if not cached."""
+        if not self.manager.exists:
+            raise ValueError("Vector store not found. Run: python -m scripts.ingest")
         if self.bm25_index is None:
             raise ValueError("BM25 index not found. Run: python -m scripts.ingest --build-bm25")
 
-        # Build chain if not cached
         if self._hybrid_chain is None:
             retriever = HybridRetriever(
                 vector_retriever=self.manager.get_retriever(k=RETRIEVER_K * 2),
@@ -191,6 +203,21 @@ class QueryService:
             )
             self._hybrid_retriever = retriever
 
+    def query_hybrid(self, question: str) -> dict:
+        """
+        Execute hybrid (vector + BM25) search query.
+
+        Args:
+            question: User question
+
+        Returns:
+            dict with:
+                - answer: str
+                - sources: list[dict]
+                - mode: "hybrid"
+        """
+        self._ensure_hybrid_chain()
+
         # Execute query
         answer = self._hybrid_chain.invoke(question)
 
@@ -203,6 +230,25 @@ class QueryService:
             "sources": sources,
             "mode": "hybrid",
         }
+
+    def query_hybrid_stream(self, question: str):
+        """
+        Stream hybrid search query token by token.
+
+        Yields partial answer strings, then yields the final dict with sources.
+        """
+        self._ensure_hybrid_chain()
+
+        # Stream tokens
+        answer = ""
+        for chunk in self._hybrid_chain.stream(question):
+            answer += chunk
+            yield {"partial": answer, "mode": "hybrid"}
+
+        # Append sources at the end
+        docs = self._hybrid_retriever.invoke(question)
+        sources = self._extract_sources(docs)
+        yield {"answer": answer, "sources": sources, "mode": "hybrid"}
 
     def query_agentic(self, question: str) -> dict:
         """

@@ -109,17 +109,65 @@ def create_interface():
     status_lines.append(f"**Embedding Model:** `{EMBED_MODEL}`")
     status_md = "\n\n".join(status_lines)
 
-    # Helper function for chat interactions
+    # Helper function for chat interactions (streaming)
     def respond(message, chat_history, query_mode):
-        """Handle user message and update chat history."""
+        """Handle user message and stream response token by token."""
         if not message.strip():
-            return chat_history, ""
+            yield chat_history, ""
+            return
 
-        response = chat_fn(message, chat_history, query_mode)
-        # Use Gradio 6.x message format
         chat_history.append({"role": "user", "content": message})
-        chat_history.append({"role": "assistant", "content": response})
-        return chat_history, ""
+
+        # Check system status
+        status = query_service.get_status()
+        if not status["vector_store_exists"]:
+            chat_history.append({"role": "assistant", "content": "❌ **Vector store not found.**\n\nPlease run:\n```bash\npython -m scripts.ingest\n```"})
+            yield chat_history, ""
+            return
+
+        try:
+            # Agentic mode: no token streaming (AgentExecutor doesn't support it simply)
+            if query_mode == "Agentic (Multi-step)":
+                response = chat_fn(message, chat_history, query_mode)
+                chat_history.append({"role": "assistant", "content": response})
+                yield chat_history, ""
+                return
+
+            # Basic & Hybrid: stream tokens
+            if query_mode == "Basic (Vector)":
+                stream = query_service.query_basic_stream(message)
+            elif query_mode == "Hybrid (Vector+BM25)":
+                if not status["bm25_exists"]:
+                    chat_history.append({"role": "assistant", "content": "⚠️ **BM25 index not found.**\n\nTo enable hybrid search, run:\n```bash\npython -m scripts.ingest --build-bm25\n```"})
+                    yield chat_history, ""
+                    return
+                stream = query_service.query_hybrid_stream(message)
+            else:
+                chat_history.append({"role": "assistant", "content": f"❌ Unknown mode: {query_mode}"})
+                yield chat_history, ""
+                return
+
+            # Add empty assistant message that we'll update as tokens arrive
+            chat_history.append({"role": "assistant", "content": ""})
+
+            for chunk in stream:
+                if "partial" in chunk:
+                    # Update the last message with streamed tokens
+                    chat_history[-1]["content"] = chunk["partial"]
+                    yield chat_history, ""
+                elif "answer" in chunk:
+                    # Final chunk: format with sources
+                    chat_history[-1]["content"] = format_response(chunk)
+                    yield chat_history, ""
+
+        except Exception as e:
+            error_msg = str(e)
+            if "connection refused" in error_msg.lower() or "connect" in error_msg.lower():
+                msg = "❌ **Cannot connect to llama-server.**\n\nPlease ensure llama-server is running:\n```bash\n/home/ids9x/start-llama-server.sh\n```"
+            else:
+                msg = f"❌ **Error:** {error_msg}"
+            chat_history.append({"role": "assistant", "content": msg})
+            yield chat_history, ""
 
     # Create Gradio interface with Blocks for custom layout
     with gr.Blocks(title="RAG System") as demo:
