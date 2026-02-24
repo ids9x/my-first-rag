@@ -65,17 +65,52 @@ CATEGORY_TO_LABEL = {
 
 
 def parse_llm_json(text: str) -> dict:
-    """Parse JSON from LLM output, stripping markdown fences if present.
+    """Parse JSON from LLM output, stripping wrappers if present.
+
+    Handles common LLM output quirks:
+      - Qwen3 <think>...</think> reasoning blocks before the JSON
+      - Markdown code fences (```json ... ```)
+      - Leading/trailing prose around the JSON object
 
     Args:
-        text: Raw LLM output that may contain ```json ... ``` wrappers.
+        text: Raw LLM output that may contain wrappers around JSON.
 
     Returns:
         Parsed dict from the JSON content.
     """
-    # Strip markdown code fences (```json ... ``` or ``` ... ```)
-    cleaned = re.sub(r'```(?:json)?\s*', '', text).strip().rstrip('`')
-    return json.loads(cleaned)
+    # 1. Remove <think>...</think> blocks (Qwen3 reasoning mode)
+    cleaned = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
+
+    # 2. Strip markdown code fences (```json ... ``` or ``` ... ```)
+    cleaned = re.sub(r'```(?:json)?\s*', '', cleaned).strip().rstrip('`')
+
+    # 3. Try direct parse first (fastest path)
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        pass
+
+    # 4. Fallback: find the first JSON object {...} in the text
+    match = re.search(r'\{[^{}]*\}', cleaned)
+    if match:
+        try:
+            return json.loads(match.group())
+        except json.JSONDecodeError:
+            pass
+
+    # 5. Fallback: LLM returned malformed JSON with unquoted values.
+    #    Extract category and reasoning with regex instead of JSON parsing.
+    #    Example: {"category": "factual_lookup", "reasoning": some unquoted text}
+    cat_match = re.search(r'"category"\s*:\s*"([^"]+)"', cleaned)
+    if cat_match:
+        category = cat_match.group(1)
+        # Try to grab reasoning (may be quoted or unquoted)
+        reason_match = re.search(r'"reasoning"\s*:\s*"?([^"{}]+)"?\s*\}?', cleaned)
+        reasoning = reason_match.group(1).strip() if reason_match else "No reasoning"
+        return {"category": category, "reasoning": reasoning}
+
+    # 6. Nothing worked — raise so the caller can fall back
+    raise json.JSONDecodeError("No JSON object found in LLM output", cleaned, 0)
 
 
 def classify_query(question: str, llm=None) -> dict:
@@ -107,6 +142,12 @@ def classify_query(question: str, llm=None) -> dict:
         response = llm.invoke(prompt_text)
         raw_text = response.content
 
+        # Debug: show what the LLM actually returned (first 300 chars)
+        console.print(
+            f"[dim]Router: raw LLM output ({len(raw_text)} chars): "
+            f"{repr(raw_text[:300])}[/dim]"
+        )
+
         # Parse the JSON response
         result = parse_llm_json(raw_text)
 
@@ -129,6 +170,7 @@ def classify_query(question: str, llm=None) -> dict:
             f"[yellow]Router: failed to parse classification JSON ({e}), "
             f"falling back to 'comparative' (Hybrid)[/yellow]"
         )
+        console.print(f"[dim]Router: raw text was: {repr(raw_text[:500])}[/dim]")
         return {
             "category": "comparative",
             "reasoning": f"Fallback — could not parse LLM classification: {e}",
