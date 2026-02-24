@@ -5,6 +5,7 @@ Provides clean, reusable functions for Basic, Hybrid, and Agentic query modes.
 Used by both CLI (scripts/query.py) and web UI (app.py).
 """
 from pathlib import Path
+from operator import itemgetter
 from typing import Optional
 
 from langchain_core.runnables import RunnablePassthrough
@@ -120,19 +121,24 @@ class QueryService:
             llm = get_llm()
 
             self._basic_chain = (
-                {"context": retriever | format_docs, "question": RunnablePassthrough()}
+                {
+                    "context": itemgetter("question") | retriever | format_docs,
+                    "question": itemgetter("question"),
+                    "chat_history": itemgetter("chat_history"),
+                }
                 | prompt
                 | llm
                 | StrOutputParser()
             )
             self._basic_retriever = retriever
 
-    def query_basic(self, question: str) -> dict:
+    def query_basic(self, question: str, chat_history: list | None = None) -> dict:
         """
         Execute basic vector search query.
 
         Args:
             question: User question
+            chat_history: Optional LangChain message list for multi-turn context
 
         Returns:
             dict with:
@@ -146,7 +152,8 @@ class QueryService:
         self._ensure_basic_chain()
 
         # Execute query
-        answer = self._basic_chain.invoke(question)
+        input_dict = {"question": question, "chat_history": chat_history or []}
+        answer = self._basic_chain.invoke(input_dict)
 
         # Get source documents
         docs = self._basic_retriever.invoke(question)
@@ -158,7 +165,7 @@ class QueryService:
             "mode": "basic",
         }
 
-    def query_basic_stream(self, question: str):
+    def query_basic_stream(self, question: str, chat_history: list | None = None):
         """
         Stream basic vector search query token by token.
 
@@ -170,8 +177,9 @@ class QueryService:
         self._ensure_basic_chain()
 
         # Stream tokens
+        input_dict = {"question": question, "chat_history": chat_history or []}
         answer = ""
-        for chunk in self._basic_chain.stream(question):
+        for chunk in self._basic_chain.stream(input_dict):
             answer += chunk
             yield {"partial": answer, "mode": "basic"}
 
@@ -198,19 +206,24 @@ class QueryService:
             llm = get_llm()
 
             self._hybrid_chain = (
-                {"context": retriever | format_docs, "question": RunnablePassthrough()}
+                {
+                    "context": itemgetter("question") | retriever | format_docs,
+                    "question": itemgetter("question"),
+                    "chat_history": itemgetter("chat_history"),
+                }
                 | prompt
                 | llm
                 | StrOutputParser()
             )
             self._hybrid_retriever = retriever
 
-    def query_hybrid(self, question: str) -> dict:
+    def query_hybrid(self, question: str, chat_history: list | None = None) -> dict:
         """
         Execute hybrid (vector + BM25) search query.
 
         Args:
             question: User question
+            chat_history: Optional LangChain message list for multi-turn context
 
         Returns:
             dict with:
@@ -221,7 +234,8 @@ class QueryService:
         self._ensure_hybrid_chain()
 
         # Execute query
-        answer = self._hybrid_chain.invoke(question)
+        input_dict = {"question": question, "chat_history": chat_history or []}
+        answer = self._hybrid_chain.invoke(input_dict)
 
         # Get source documents
         docs = self._hybrid_retriever.invoke(question)
@@ -233,7 +247,7 @@ class QueryService:
             "mode": "hybrid",
         }
 
-    def query_hybrid_stream(self, question: str):
+    def query_hybrid_stream(self, question: str, chat_history: list | None = None):
         """
         Stream hybrid search query token by token.
 
@@ -242,8 +256,9 @@ class QueryService:
         self._ensure_hybrid_chain()
 
         # Stream tokens
+        input_dict = {"question": question, "chat_history": chat_history or []}
         answer = ""
-        for chunk in self._hybrid_chain.stream(question):
+        for chunk in self._hybrid_chain.stream(input_dict):
             answer += chunk
             yield {"partial": answer, "mode": "hybrid"}
 
@@ -252,12 +267,13 @@ class QueryService:
         sources = self._extract_sources(docs)
         yield {"answer": answer, "sources": sources, "mode": "hybrid"}
 
-    def query_agentic(self, question: str) -> dict:
+    def query_agentic(self, question: str, chat_history: list | None = None) -> dict:
         """
         Execute agentic (multi-step reasoning) query.
 
         Args:
             question: User question
+            chat_history: Optional LangChain message list for multi-turn context
 
         Returns:
             dict with:
@@ -278,7 +294,10 @@ class QueryService:
             )
 
         # Execute query
-        result = self._agent.invoke({"input": question})
+        result = self._agent.invoke({
+            "input": question,
+            "chat_history": chat_history or [],
+        })
 
         # Extract reasoning steps
         reasoning_steps = []
@@ -309,7 +328,7 @@ class QueryService:
             "mode": "agentic",
         }
 
-    def query_router(self, question: str) -> dict:
+    def query_router(self, question: str, chat_history: list | None = None) -> dict:
         """Auto-route to best pipeline via LLM classification.
 
         Uses a lightweight LLM call to classify the question type, then
@@ -317,6 +336,7 @@ class QueryService:
 
         Args:
             question: User question
+            chat_history: Optional LangChain message list for multi-turn context
 
         Returns:
             dict with:
@@ -328,7 +348,7 @@ class QueryService:
         """
         from modules.router import route_and_execute  # lazy import
 
-        return route_and_execute(question, self)
+        return route_and_execute(question, self, chat_history=chat_history)
 
     def query_map_reduce(self, question: str) -> dict:
         """Map-reduce: LLM processes each chunk independently, then synthesises.
@@ -378,7 +398,7 @@ class QueryService:
 
         return map_reduce_query(question, retriever, llm)
 
-    def query_parallel(self, question: str) -> dict:
+    def query_parallel(self, question: str, chat_history: list | None = None) -> dict:
         """Parallel retrieval + merge: broadest coverage from multiple strategies.
 
         Runs vector, hybrid, and reranked retrieval concurrently, merges
@@ -386,6 +406,7 @@ class QueryService:
 
         Args:
             question: User question
+            chat_history: Optional LangChain message list for multi-turn context
 
         Returns:
             dict with:
@@ -400,4 +421,4 @@ class QueryService:
         if not self.manager.exists:
             raise ValueError("Vector store not found. Run: python -m scripts.ingest")
 
-        return parallel_merge_query(question, self)
+        return parallel_merge_query(question, self, chat_history=chat_history)

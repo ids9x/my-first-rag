@@ -105,3 +105,8 @@ MAP_REDUCE_TEMPERATURE = 0.1      # Low temp for factual extraction
 PARALLEL_PER_STRATEGY_K = 6      # Chunks per strategy
 PARALLEL_FINAL_K = 6             # Chunks after merge (can be more than standard 4)
 PARALLEL_MAX_WORKERS = 3         # One thread per strategy
+
+# =============================================================================
+# Multi-turn Context
+# =============================================================================
+MULTI_TURN_MAX_EXCHANGES = 5     # Max Q&A pairs passed to LLM for follow-ups

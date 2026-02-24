@@ -108,6 +108,7 @@ Your approach:
 
 Be precise and factual. These are regulatory documents — accuracy matters.""",
         ),
+        MessagesPlaceholder("chat_history", optional=True),
         ("human", "{input}"),
         MessagesPlaceholder(variable_name="agent_scratchpad"),
     ])

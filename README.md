@@ -896,6 +896,14 @@ for query in queries:
 | Map-Reduce | Thorough analysis, dense content | Slow (~15-25s) |
 | Parallel + Merge | Broadest coverage, multi-strategy | Medium (~10-15s) |
 
+### Web UI Features
+
+**Chat Export** — Click **Export Chat** to download the full conversation as a markdown file with timestamps and formatted Q&A pairs.
+
+**Progress Indicators** — Non-streaming modes (Router, Agentic, Map-Reduce, Parallel) show a mode-specific status message while processing, so you know the system is working during longer queries.
+
+**Multi-turn Context** — Enable the **Multi-turn context** checkbox to pass recent chat history (up to 5 exchanges) to the LLM. This allows natural follow-up questions like "What are its key requirements?" after asking about a specific standard. Uncheck to return to stateless queries at any time. The **Clear** button resets all context. Multi-turn is supported in all modes except Map-Reduce (which processes chunks independently).
+
 > ⚠️ When adding BM25 to an existing store, **always specify the same chunking strategy** used during initial ingestion to avoid duplicate chunks.
 
 ---

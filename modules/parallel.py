@@ -127,7 +127,7 @@ def merge_and_deduplicate(
     return merged_docs, strategy_counts
 
 
-def parallel_merge_query(question: str, query_service) -> dict:
+def parallel_merge_query(question: str, query_service, chat_history=None) -> dict:
     """Full parallel + merge pipeline.
 
     Runs multiple retrieval strategies concurrently, merges their results,
@@ -140,6 +140,7 @@ def parallel_merge_query(question: str, query_service) -> dict:
         question: The user's natural-language question.
         query_service: A QueryService instance with manager, bm25_index,
                        and reranker attributes.
+        chat_history: Optional LangChain message list for multi-turn context.
 
     Returns:
         dict with:
@@ -242,8 +243,12 @@ def parallel_merge_query(question: str, query_service) -> dict:
     prompt = get_prompt()
     llm = get_llm()
 
-    # Format the prompt with context and question, then invoke
-    formatted = prompt.invoke({"context": context, "question": question})
+    # Format the prompt with context, question, and optional chat history
+    formatted = prompt.invoke({
+        "context": context,
+        "question": question,
+        "chat_history": chat_history or [],
+    })
 
     try:
         response = llm.invoke(formatted)

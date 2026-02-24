@@ -6,10 +6,18 @@ Launch with:
 
 Then open http://127.0.0.1:7860 in your browser.
 """
+import tempfile
+from datetime import datetime
+
 import gradio as gr
 from gradio.themes.utils import fonts
+from langchain_core.messages import HumanMessage, AIMessage
+
 from core.query_service import QueryService
-from config.settings import WEB_HOST, WEB_PORT, WEB_SHARE, CHAT_MODEL, EMBED_MODEL
+from config.settings import (
+    WEB_HOST, WEB_PORT, WEB_SHARE, CHAT_MODEL, EMBED_MODEL,
+    MULTI_TURN_MAX_EXCHANGES,
+)
 
 
 def build_theme() -> gr.themes.Base:
@@ -139,14 +147,90 @@ def format_response(result: dict) -> str:
     return answer
 
 
-def chat_fn(message: str, history: list, mode: str) -> str:
+def _thinking_message(query_mode: str) -> str:
+    """Return a mode-specific thinking/progress message."""
+    messages = {
+        "Router (Auto)": "Classifying question and routing to best pipeline...",
+        "Agentic (Multi-step)": "Reasoning through multiple retrieval steps...",
+        "Map-Reduce": "Retrieving chunks and processing each independently...",
+        "Parallel + Merge": "Running multiple retrieval strategies in parallel...",
+    }
+    return f"**{messages.get(query_mode, 'Processing...')}**"
+
+
+def _build_chat_history(chat_history: list, max_exchanges: int) -> list:
+    """Convert recent Gradio chat messages to LangChain message format.
+
+    Takes the most recent exchanges (excluding the current user message,
+    which is the last item) and converts them to HumanMessage/AIMessage.
+
+    Args:
+        chat_history: Gradio chat list [{"role": "user"|"assistant", "content": ...}]
+        max_exchanges: Maximum number of Q&A pairs to include
+
+    Returns:
+        List of LangChain HumanMessage/AIMessage objects
+    """
+    # Exclude the latest user message (it's passed as the question directly)
+    prior = chat_history[:-1]
+    # Take last N exchanges (2 messages per exchange)
+    prior = prior[-(max_exchanges * 2):]
+    messages = []
+    for msg in prior:
+        if msg["role"] == "user":
+            messages.append(HumanMessage(content=msg["content"]))
+        elif msg["role"] == "assistant":
+            messages.append(AIMessage(content=msg["content"]))
+    return messages
+
+
+def export_chat(chat_history: list):
+    """Export chat history as a downloadable markdown file.
+
+    Args:
+        chat_history: Gradio chat list [{"role": "user"|"assistant", "content": ...}]
+
+    Returns:
+        gr.File update with the exported file, or hidden if chat is empty
+    """
+    if not chat_history:
+        return gr.File(visible=False)
+
+    lines = [
+        f"# RAG Chat Export",
+        f"**Exported:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        f"**Messages:** {len(chat_history)}",
+        "",
+        "---",
+        "",
+    ]
+    for msg in chat_history:
+        role = "User" if msg["role"] == "user" else "Assistant"
+        lines.append(f"### {role}")
+        lines.append("")
+        lines.append(msg["content"])
+        lines.append("")
+        lines.append("---")
+        lines.append("")
+
+    md_content = "\n".join(lines)
+    tmp = tempfile.NamedTemporaryFile(
+        mode="w", suffix=".md", prefix="rag_chat_", delete=False,
+    )
+    tmp.write(md_content)
+    tmp.close()
+    return gr.File(value=tmp.name, visible=True)
+
+
+def chat_fn(message: str, history: list, mode: str, chat_history_lc: list | None = None) -> str:
     """
     Process user message and return response.
 
     Args:
         message: User's question
-        history: Chat history (not used currently)
+        history: Chat history (Gradio format, for context)
         mode: Selected query mode
+        chat_history_lc: Optional LangChain message list for multi-turn context
 
     Returns:
         Formatted response string
@@ -162,24 +246,24 @@ def chat_fn(message: str, history: list, mode: str) -> str:
     try:
         # Route to appropriate query method based on mode
         if mode == "Basic (Vector)":
-            result = query_service.query_basic(message)
+            result = query_service.query_basic(message, chat_history=chat_history_lc)
 
         elif mode == "Hybrid (Vector+BM25)":
             if not status["bm25_exists"]:
                 return "⚠️ **BM25 index not found.**\n\nTo enable hybrid search, run:\n```bash\npython -m scripts.ingest --build-bm25\n```"
-            result = query_service.query_hybrid(message)
+            result = query_service.query_hybrid(message, chat_history=chat_history_lc)
 
         elif mode == "Agentic (Multi-step)":
-            result = query_service.query_agentic(message)
+            result = query_service.query_agentic(message, chat_history=chat_history_lc)
 
         elif mode == "Router (Auto)":
-            result = query_service.query_router(message)
+            result = query_service.query_router(message, chat_history=chat_history_lc)
 
         elif mode == "Map-Reduce":
             result = query_service.query_map_reduce(message)
 
         elif mode == "Parallel + Merge":
-            result = query_service.query_parallel(message)
+            result = query_service.query_parallel(message, chat_history=chat_history_lc)
 
         else:
             return f"❌ Unknown mode: {mode}"
@@ -213,13 +297,20 @@ def create_interface():
     status_md = "\n\n".join(status_lines)
 
     # Helper function for chat interactions (streaming)
-    def respond(message, chat_history, query_mode):
+    def respond(message, chat_history, query_mode, multi_turn):
         """Handle user message and stream response token by token."""
         if not message.strip():
             yield chat_history, ""
             return
 
         chat_history.append({"role": "user", "content": message})
+
+        # Build LangChain chat history for multi-turn context
+        chat_history_lc = None
+        if multi_turn:
+            chat_history_lc = _build_chat_history(
+                chat_history, MULTI_TURN_MAX_EXCHANGES,
+            )
 
         # Check system status
         status = query_service.get_status()
@@ -229,22 +320,30 @@ def create_interface():
             return
 
         try:
-            # Agentic & Router: no token streaming (these do multi-step work internally)
+            # Agentic, Router, Map-Reduce, Parallel: no token streaming
+            # Show a thinking message while processing
             if query_mode in ("Agentic (Multi-step)", "Router (Auto)", "Map-Reduce", "Parallel + Merge"):
-                response = chat_fn(message, chat_history, query_mode)
-                chat_history.append({"role": "assistant", "content": response})
+                chat_history.append({"role": "assistant", "content": _thinking_message(query_mode)})
+                yield chat_history, ""
+
+                response = chat_fn(message, chat_history, query_mode, chat_history_lc)
+                chat_history[-1]["content"] = response
                 yield chat_history, ""
                 return
 
             # Basic & Hybrid: stream tokens
             if query_mode == "Basic (Vector)":
-                stream = query_service.query_basic_stream(message)
+                stream = query_service.query_basic_stream(
+                    message, chat_history=chat_history_lc,
+                )
             elif query_mode == "Hybrid (Vector+BM25)":
                 if not status["bm25_exists"]:
                     chat_history.append({"role": "assistant", "content": "⚠️ **BM25 index not found.**\n\nTo enable hybrid search, run:\n```bash\npython -m scripts.ingest --build-bm25\n```"})
                     yield chat_history, ""
                     return
-                stream = query_service.query_hybrid_stream(message)
+                stream = query_service.query_hybrid_stream(
+                    message, chat_history=chat_history_lc,
+                )
             else:
                 chat_history.append({"role": "assistant", "content": f"❌ Unknown mode: {query_mode}"})
                 yield chat_history, ""
@@ -392,6 +491,15 @@ def create_interface():
         with gr.Row():
             submit = gr.Button("Submit", variant="primary")
             clear = gr.Button("Clear")
+            export_btn = gr.Button("Export Chat")
+
+        multi_turn = gr.Checkbox(
+            label="Multi-turn context",
+            value=False,
+            info="Pass recent chat history to the LLM for follow-up questions",
+        )
+
+        export_file = gr.File(label="Exported Chat", visible=False)
 
         # Example questions the user can click to auto-fill
         gr.Examples(
@@ -419,9 +527,13 @@ def create_interface():
                                js=font_size_js)
 
         # Connect components
-        submit.click(respond, [msg, chatbot, mode], [chatbot, msg])
-        msg.submit(respond, [msg, chatbot, mode], [chatbot, msg])
-        clear.click(lambda: ([], ""), None, [chatbot, msg], queue=False)
+        submit.click(respond, [msg, chatbot, mode, multi_turn], [chatbot, msg])
+        msg.submit(respond, [msg, chatbot, mode, multi_turn], [chatbot, msg])
+        clear.click(
+            lambda: ([], "", gr.File(visible=False)),
+            None, [chatbot, msg, export_file], queue=False,
+        )
+        export_btn.click(export_chat, [chatbot], [export_file])
 
     return demo
 
