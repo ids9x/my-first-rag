@@ -3,7 +3,8 @@
     "allow": [
       "Read(//home/ids9x/**)",
       "Bash(git add:*)",
-      "Bash(sudo systemctl restart:*)"
+      "Bash(sudo systemctl restart:*)",
+      "Bash(git status:*)"
     ]
   }
 }

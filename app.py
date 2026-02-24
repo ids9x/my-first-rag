@@ -21,11 +21,11 @@ from config.settings import (
 
 
 def build_theme() -> gr.themes.Base:
-    """Build a dark high-contrast theme with Inter font for readability."""
+    """Build a light high-contrast theme with Inter font for readability."""
     return gr.themes.Base(
-        primary_hue=gr.themes.colors.cyan,
-        secondary_hue=gr.themes.colors.blue,
-        neutral_hue=gr.themes.colors.gray,
+        primary_hue=gr.themes.colors.blue,
+        secondary_hue=gr.themes.colors.cyan,
+        neutral_hue=gr.themes.colors.slate,
         text_size=gr.themes.sizes.text_lg,
         font=[
             fonts.GoogleFont("Inter"),
@@ -40,43 +40,43 @@ def build_theme() -> gr.themes.Base:
             "monospace",
         ],
     ).set(
-        # --- Dark background ---
-        body_background_fill="#0f1117",
-        body_background_fill_dark="#0f1117",
-        background_fill_primary="#1a1d27",
-        background_fill_primary_dark="#1a1d27",
-        background_fill_secondary="#232734",
-        background_fill_secondary_dark="#232734",
+        # --- Light background ---
+        body_background_fill="#ffffff",
+        body_background_fill_dark="#ffffff",
+        background_fill_primary="#f8f9fa",
+        background_fill_primary_dark="#f8f9fa",
+        background_fill_secondary="#e9ecef",
+        background_fill_secondary_dark="#e9ecef",
         # --- High-contrast text ---
-        body_text_color="#e8eaed",
-        body_text_color_dark="#e8eaed",
-        body_text_color_subdued="#9aa0a6",
-        body_text_color_subdued_dark="#9aa0a6",
+        body_text_color="#1a1a2e",
+        body_text_color_dark="#1a1a2e",
+        body_text_color_subdued="#495057",
+        body_text_color_subdued_dark="#495057",
         # --- Borders and inputs ---
-        border_color_primary="#3c4043",
-        border_color_primary_dark="#3c4043",
-        input_background_fill="#232734",
-        input_background_fill_dark="#232734",
-        input_border_color="#3c4043",
-        input_border_color_dark="#3c4043",
+        border_color_primary="#ced4da",
+        border_color_primary_dark="#ced4da",
+        input_background_fill="#ffffff",
+        input_background_fill_dark="#ffffff",
+        input_border_color="#adb5bd",
+        input_border_color_dark="#adb5bd",
         # --- Buttons ---
-        button_primary_background_fill="#00bcd4",
-        button_primary_background_fill_dark="#00bcd4",
-        button_primary_text_color="#000000",
-        button_primary_text_color_dark="#000000",
-        button_secondary_background_fill="#2d3240",
-        button_secondary_background_fill_dark="#2d3240",
-        button_secondary_text_color="#e8eaed",
-        button_secondary_text_color_dark="#e8eaed",
+        button_primary_background_fill="#0066cc",
+        button_primary_background_fill_dark="#0066cc",
+        button_primary_text_color="#ffffff",
+        button_primary_text_color_dark="#ffffff",
+        button_secondary_background_fill="#e9ecef",
+        button_secondary_background_fill_dark="#e9ecef",
+        button_secondary_text_color="#1a1a2e",
+        button_secondary_text_color_dark="#1a1a2e",
         # --- Blocks (panels, accordions) ---
-        block_background_fill="#1a1d27",
-        block_background_fill_dark="#1a1d27",
-        block_border_color="#3c4043",
-        block_border_color_dark="#3c4043",
-        block_label_text_color="#e8eaed",
-        block_label_text_color_dark="#e8eaed",
-        block_title_text_color="#e8eaed",
-        block_title_text_color_dark="#e8eaed",
+        block_background_fill="#f8f9fa",
+        block_background_fill_dark="#f8f9fa",
+        block_border_color="#dee2e6",
+        block_border_color_dark="#dee2e6",
+        block_label_text_color="#1a1a2e",
+        block_label_text_color_dark="#1a1a2e",
+        block_title_text_color="#1a1a2e",
+        block_title_text_color_dark="#1a1a2e",
     )
 
 # Initialize query service globally
@@ -206,9 +206,13 @@ def export_chat(chat_history: list):
     ]
     for msg in chat_history:
         role = "User" if msg["role"] == "user" else "Assistant"
+        content = msg["content"]
+        # Gradio may store content as a list of parts — flatten to string
+        if isinstance(content, list):
+            content = "\n".join(str(part) for part in content)
         lines.append(f"### {role}")
         lines.append("")
-        lines.append(msg["content"])
+        lines.append(str(content))
         lines.append("")
         lines.append("---")
         lines.append("")
@@ -376,12 +380,13 @@ def create_interface():
     font_size_js = """
     (size) => {
         const px = size + 'px';
-        document.documentElement.style.setProperty('--chat-font-size', px);
         const style = document.getElementById('dynamic-font-style');
         if (style) {
             style.textContent = `
-                #rag-chatbot .message-bubble-border { font-size: ${px} !important; }
-                #rag-chatbot .message-bubble-border * { font-size: inherit !important; }
+                #rag-chatbot { --chatbot-text-size: ${px} !important; }
+                #rag-chatbot .message-wrap { font-size: ${px} !important; }
+                #rag-chatbot .message .prose { font-size: ${px} !important; }
+                #rag-chatbot .message .prose * { font-size: inherit !important; }
                 #rag-msg textarea { font-size: ${px} !important; }
             `;
         }
@@ -393,8 +398,10 @@ def create_interface():
     with gr.Blocks(
         title="RAG System",
         css="""
-            #rag-chatbot .message-bubble-border { font-size: 16px; }
-            #rag-chatbot .message-bubble-border * { font-size: inherit; }
+            #rag-chatbot { --chatbot-text-size: 16px; }
+            #rag-chatbot .message-wrap { font-size: 16px; }
+            #rag-chatbot .message .prose { font-size: 16px; }
+            #rag-chatbot .message .prose * { font-size: inherit; }
             #rag-msg textarea { font-size: 16px; }
         """,
         head='<style id="dynamic-font-style"></style>',
