@@ -42,6 +42,39 @@ def format_response(result: dict) -> str:
                 answer += f"{step}\n\n"
         answer += "</details>"
 
+    # Append map summaries for map-reduce mode
+    map_summaries = result.get("map_summaries", [])
+    if map_summaries:
+        chunk_count = result.get("chunk_count", len(map_summaries))
+        answer += (
+            f"\n\n<details>\n<summary><b>🗺️ Map Summaries "
+            f"({chunk_count} chunks)</b></summary>\n\n"
+        )
+        for summary in map_summaries:
+            answer += f"- {summary}\n\n"
+        answer += "</details>"
+
+    # Append strategy contributions for parallel mode
+    strategy_counts = result.get("strategy_counts")
+    if strategy_counts:
+        total = result.get("total_unique_chunks", 0)
+        answer += (
+            f"\n\n<details>\n<summary><b>⚡ Strategy Contributions "
+            f"({total} unique chunks)</b></summary>\n\n"
+        )
+        for strategy, count in strategy_counts.items():
+            answer += f"- **{strategy}**: {count} chunks\n\n"
+        answer += "</details>"
+
+    # Append routing decision for router mode
+    routed_to = result.get("routed_to")
+    if routed_to:
+        reasoning = result.get("classification_reasoning", "")
+        answer += "\n\n<details>\n<summary><b>🔀 Routing Decision</b></summary>\n\n"
+        answer += f"**Routed to:** {routed_to}\n\n"
+        answer += f"**Reasoning:** {reasoning}\n\n"
+        answer += "</details>"
+
     return answer
 
 
@@ -77,6 +110,15 @@ def chat_fn(message: str, history: list, mode: str) -> str:
 
         elif mode == "Agentic (Multi-step)":
             result = query_service.query_agentic(message)
+
+        elif mode == "Router (Auto)":
+            result = query_service.query_router(message)
+
+        elif mode == "Map-Reduce":
+            result = query_service.query_map_reduce(message)
+
+        elif mode == "Parallel + Merge":
+            result = query_service.query_parallel(message)
 
         else:
             return f"❌ Unknown mode: {mode}"
@@ -126,8 +168,8 @@ def create_interface():
             return
 
         try:
-            # Agentic mode: no token streaming (AgentExecutor doesn't support it simply)
-            if query_mode == "Agentic (Multi-step)":
+            # Agentic & Router: no token streaming (these do multi-step work internally)
+            if query_mode in ("Agentic (Multi-step)", "Router (Auto)", "Map-Reduce", "Parallel + Merge"):
                 response = chat_fn(message, chat_history, query_mode)
                 chat_history.append({"role": "assistant", "content": response})
                 yield chat_history, ""
@@ -183,11 +225,14 @@ def create_interface():
             choices=[
                 "Basic (Vector)",
                 "Hybrid (Vector+BM25)",
-                "Agentic (Multi-step)"
+                "Agentic (Multi-step)",
+                "Router (Auto)",
+                "Map-Reduce",
+                "Parallel + Merge",
             ],
             value="Basic (Vector)",
             label="Query Mode",
-            info="Basic: Semantic search | Hybrid: Vector + keywords | Agentic: Multi-step reasoning"
+            info="Basic: Semantic search | Hybrid: Vector + keywords | Agentic: Multi-step | Router: Auto-selects | Map-Reduce: Per-chunk analysis | Parallel: Multi-strategy"
         )
 
         # Chat components (manual implementation for proper integration)

@@ -84,3 +84,24 @@ DEFAULT_COLLECTION = "documents"
 WEB_HOST = "0.0.0.0"         # Listen on all network interfaces (accessible from network)
 WEB_PORT = 7860              # Gradio default
 WEB_SHARE = False            # Set True to create public Gradio link
+
+# =============================================================================
+# Router Pattern
+# =============================================================================
+ROUTER_TEMPERATURE = 0.0          # Deterministic classification (no randomness)
+ROUTER_MAX_TOKENS = 150           # Classification response is short
+
+# =============================================================================
+# Map-Reduce
+# =============================================================================
+MAP_REDUCE_FETCH_K = 8            # Chunks to retrieve (more than standard 4)
+MAP_REDUCE_MAX_WORKERS = 4        # Parallel map threads
+MAP_REDUCE_MAP_MAX_TOKENS = 500   # Map output per chunk
+MAP_REDUCE_TEMPERATURE = 0.1      # Low temp for factual extraction
+
+# =============================================================================
+# Parallel + Merge
+# =============================================================================
+PARALLEL_PER_STRATEGY_K = 6      # Chunks per strategy
+PARALLEL_FINAL_K = 6             # Chunks after merge (can be more than standard 4)
+PARALLEL_MAX_WORKERS = 3         # One thread per strategy

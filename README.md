@@ -1,6 +1,6 @@
 # 🚀 Advanced RAG Pipeline
 
-A modular, production-ready Retrieval-Augmented Generation (RAG) system designed for nuclear regulatory documents (NQA-1, ASME, IAEA standards). Features multiple retrieval strategies, cross-encoder reranking, and agentic reasoning.
+A modular, production-ready Retrieval-Augmented Generation (RAG) system designed for nuclear regulatory documents (NQA-1, ASME, IAEA standards). Features six query modes including LLM-driven query routing, map-reduce analysis, parallel multi-strategy retrieval, cross-encoder reranking, and agentic reasoning.
 
 ---
 
@@ -151,8 +151,11 @@ my-first-rag/
 │   ├── chunking.py     # Document chunking strategies
 │   ├── hybrid_search.py # Vector + BM25 hybrid search
 │   ├── knowledge_graph.py # Knowledge graph extraction
+│   ├── map_reduce.py   # Map-reduce per-chunk analysis
 │   ├── multilingual.py # Multilingual support
-│   └── reranking.py    # Cross-encoder reranking
+│   ├── parallel.py     # Parallel multi-strategy retrieval
+│   ├── reranking.py    # Cross-encoder reranking
+│   └── router.py       # LLM query classifier + auto-dispatch
 ├── scripts/            # CLI scripts
 │   ├── ingest.py       # Document ingestion
 │   ├── query.py        # Query interface
@@ -364,6 +367,86 @@ python -m scripts.query --mode agentic
 
 ---
 
+### Mode 5: Router (Auto-Select)
+
+**Best for:** When you're not sure which mode to use — let the LLM decide
+
+```
+You: What is the definition of safety class?
+  ↓
+[LLM Classifier] → "factual_lookup" → Routes to Basic mode
+  ↓
+[Basic Vector Search] → Answer
+```
+
+The router uses a lightweight LLM call to classify your question into one of three categories, then automatically dispatches to the best pipeline:
+
+| Category | Routes to | Trigger signals |
+|----------|-----------|-----------------|
+| `factual_lookup` | Basic | Definitions, specific clause lookups, short factual questions |
+| `comparative` | Hybrid | Comparing standards, cross-document questions |
+| `exploratory` | Agentic | Open-ended analysis, multi-hop reasoning |
+
+**Features:**
+- Adds ~1-3 seconds overhead for classification
+- Shows routing decision in a collapsible details block
+- Falls back to Hybrid if classification fails
+
+---
+
+### Mode 6: Map-Reduce
+
+**Best for:** Thorough analysis of dense, multi-section content where you don't want the LLM to skip details
+
+```
+You: What are all requirements for quality assurance in nuclear facility design?
+  ↓
+[Retrieve 8 Chunks] → More chunks than standard (8 vs 4)
+  ↓
+[Map Phase — Parallel]
+  ├── Chunk 1 → LLM → Summary 1
+  ├── Chunk 2 → LLM → Summary 2
+  ├── ...
+  └── Chunk 8 → LLM → Summary 8
+  ↓
+[Reduce Phase] → Synthesise all summaries into final answer
+```
+
+**Why this matters:** Stuffing 8 chunks into one prompt often causes the LLM to fixate on the first or last chunk. Map-reduce forces engagement with every chunk individually, producing more thorough answers that don't skip requirements buried in the middle.
+
+**Features:**
+- Retrieves 8 chunks (configurable via `MAP_REDUCE_FETCH_K`)
+- Parallel map phase (4 concurrent LLM calls)
+- Shows individual chunk summaries in a collapsible details block
+- Slowest mode by design (~15-25 seconds) — thoroughness over speed
+
+---
+
+### Mode 7: Parallel + Merge
+
+**Best for:** Broadest possible coverage — combines semantic, keyword, and precision retrieval
+
+```
+You: Explain NQA-1 Section 18 inspection requirements
+  ↓
+[Parallel Retrieval]
+  ├── Thread 1: Vector Search (k=6)    → Semantic matches
+  ├── Thread 2: Hybrid Vector+BM25 (k=6) → Keyword + semantic
+  └── Thread 3: MMR Reranked (k=6)     → High-precision diverse
+  ↓
+[Merge + Deduplicate] → Union, frequency boost, top 6
+  ↓
+[LLM] → Final answer from merged context
+```
+
+**Features:**
+- Runs 2-3 strategies concurrently (depending on available components)
+- Documents found by multiple strategies rank higher (frequency boost)
+- Shows strategy contribution counts in a collapsible details block
+- Speed comparable to Hybrid mode (strategies run in parallel)
+
+---
+
 ## ⚙️ Configuration Guide
 
 All settings are in `config/settings.py`. Edit this file to customize behavior.
@@ -482,9 +565,12 @@ AGENT_TEMPERATURE = 0.1      # Low = factual, High = creative
 ├── modules/
 │   ├── chunking.py           # Text splitting strategies
 │   ├── hybrid_search.py      # BM25 + Vector fusion
-│   ├── reranking.py          # 🆕 Cross-encoder reranker
+│   ├── reranking.py          # Cross-encoder reranker
 │   ├── multilingual.py       # Prompt templates
 │   ├── agentic.py            # Multi-step reasoning
+│   ├── router.py             # LLM query classifier + auto-dispatch
+│   ├── map_reduce.py         # Per-chunk map + reduce synthesis
+│   ├── parallel.py           # Multi-strategy concurrent retrieval
 │   └── knowledge_graph.py    # Entity extraction
 ├── scripts/
 │   ├── ingest.py             # PDF → Vector store
@@ -506,7 +592,10 @@ AGENT_TEMPERATURE = 0.1      # Low = factual, High = creative
 | Prompts | Optimized templates | ✅ P4 |
 | Agentic RAG | Multi-step reasoning | ✅ P5 |
 | Knowledge Graph | Relationship extraction | ✅ P6 |
-| **Reranking** | **Cross-encoder precision** | **✅ P7** |
+| Reranking | Cross-encoder precision | ✅ P7 |
+| **Router** | **LLM auto-dispatch to best pipeline** | **✅ P8** |
+| **Map-Reduce** | **Per-chunk analysis + synthesis** | **✅ P9** |
+| **Parallel + Merge** | **Multi-strategy concurrent retrieval** | **✅ P10** |
 
 ---
 
@@ -791,9 +880,21 @@ for query in queries:
 | Hybrid query (needs BM25) | `python -m scripts.query --mode hybrid` |
 | Agentic query | `python -m scripts.query --mode agentic` |
 | KG query | `python -m scripts.query --mode kg` |
+| **Web UI (all 6 modes)** | **`python app.py`** → Select mode from radio buttons |
 | Reset database | `python -m scripts.reset_store` |
 | Change embedding model | Edit `config/settings.py` → `EMBED_MODEL` → Reset & re-ingest |
 | Enable reranking | Edit `config/settings.py` → `RERANKER_ENABLED = True` |
+
+### Gradio Web UI Modes
+
+| Mode | Best for | Speed |
+|------|----------|-------|
+| Basic (Vector) | Conceptual questions, general understanding | Fast (~5-10s) |
+| Hybrid (Vector+BM25) | Specific sections, technical terms | Fast (~5-10s) |
+| Agentic (Multi-step) | Complex multi-hop questions | Medium (~10-30s) |
+| Router (Auto) | Not sure which mode — LLM decides | Varies (adds ~2s) |
+| Map-Reduce | Thorough analysis, dense content | Slow (~15-25s) |
+| Parallel + Merge | Broadest coverage, multi-strategy | Medium (~10-15s) |
 
 > ⚠️ When adding BM25 to an existing store, **always specify the same chunking strategy** used during initial ingestion to avoid duplicate chunks.
 

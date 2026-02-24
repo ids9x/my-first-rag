@@ -23,6 +23,8 @@ from config.settings import (
     CHROMA_DIR,
     BM25_INDEX_PATH,
     RERANKER_ENABLED,
+    MAP_REDUCE_FETCH_K,
+    MAP_REDUCE_TEMPERATURE,
 )
 
 
@@ -306,3 +308,96 @@ class QueryService:
             "reasoning_steps": reasoning_steps,
             "mode": "agentic",
         }
+
+    def query_router(self, question: str) -> dict:
+        """Auto-route to best pipeline via LLM classification.
+
+        Uses a lightweight LLM call to classify the question type, then
+        dispatches to Basic, Hybrid, or Agentic mode automatically.
+
+        Args:
+            question: User question
+
+        Returns:
+            dict with:
+                - answer: str
+                - sources: list[dict]
+                - mode: "router"
+                - routed_to: str (which pipeline was chosen)
+                - classification_reasoning: str (why)
+        """
+        from modules.router import route_and_execute  # lazy import
+
+        return route_and_execute(question, self)
+
+    def query_map_reduce(self, question: str) -> dict:
+        """Map-reduce: LLM processes each chunk independently, then synthesises.
+
+        Retrieves MAP_REDUCE_FETCH_K chunks (more than standard), runs a
+        parallel map phase over each, then reduces into a final answer.
+
+        Args:
+            question: User question
+
+        Returns:
+            dict with:
+                - answer: str
+                - sources: list[dict]
+                - mode: "map_reduce"
+                - map_summaries: list[str]
+                - chunk_count: int
+        """
+        from modules.map_reduce import map_reduce_query  # lazy import
+
+        if not self.manager.exists:
+            raise ValueError("Vector store not found. Run: python -m scripts.ingest")
+
+        # Build a retriever that fetches more chunks than standard (8 vs 4).
+        # Use the best available strategy: reranked > hybrid > basic vector.
+        if self.reranker:
+            retriever = MMRRerankingRetriever(
+                vector_store=self.manager.get_store(),
+                reranker=self.reranker,
+                fetch_k=MMR_FETCH_K,
+                final_k=MAP_REDUCE_FETCH_K,
+                lambda_mult=MMR_LAMBDA_MULT,
+            )
+        elif self.bm25_index is not None:
+            retriever = HybridRetriever(
+                vector_retriever=self.manager.get_retriever(
+                    k=MAP_REDUCE_FETCH_K * 2
+                ),
+                bm25_index=self.bm25_index,
+                k=MAP_REDUCE_FETCH_K,
+                reranker=None,
+            )
+        else:
+            retriever = self.manager.get_retriever(k=MAP_REDUCE_FETCH_K)
+
+        llm = get_llm(temperature=MAP_REDUCE_TEMPERATURE)
+
+        return map_reduce_query(question, retriever, llm)
+
+    def query_parallel(self, question: str) -> dict:
+        """Parallel retrieval + merge: broadest coverage from multiple strategies.
+
+        Runs vector, hybrid, and reranked retrieval concurrently, merges
+        and deduplicates the results, then sends the merged chunks to the LLM.
+
+        Args:
+            question: User question
+
+        Returns:
+            dict with:
+                - answer: str
+                - sources: list[dict]
+                - mode: "parallel"
+                - strategy_counts: dict (strategy → chunk count)
+                - total_unique_chunks: int
+        """
+        from modules.parallel import parallel_merge_query  # lazy import
+
+        if not self.manager.exists:
+            raise ValueError("Vector store not found. Run: python -m scripts.ingest")
+
+        return parallel_merge_query(question, self)
