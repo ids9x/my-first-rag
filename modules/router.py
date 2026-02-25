@@ -185,7 +185,8 @@ def classify_query(question: str, llm=None) -> dict:
         }
 
 
-def route_and_execute(question: str, query_service, chat_history=None) -> dict:
+def route_and_execute(question: str, query_service, chat_history=None,
+                      system_prompt=None) -> dict:
     """Classify a question and dispatch to the best query pipeline.
 
     This is the main entry point called by QueryService.query_router().
@@ -197,6 +198,7 @@ def route_and_execute(question: str, query_service, chat_history=None) -> dict:
         query_service: A QueryService instance (has query_basic, query_hybrid,
                        query_agentic methods).
         chat_history: Optional LangChain message list for multi-turn context.
+        system_prompt: Optional custom system prompt text.
 
     Returns:
         dict with at minimum:
@@ -221,7 +223,8 @@ def route_and_execute(question: str, query_service, chat_history=None) -> dict:
     query_method = getattr(query_service, method_name)
 
     try:
-        result = query_method(question, chat_history=chat_history)
+        result = query_method(question, chat_history=chat_history,
+                              system_prompt=system_prompt)
     except Exception as e:
         # If the routed pipeline fails, return an error with routing info
         console.print(f"[red]Router: routed pipeline '{method_name}' failed: {e}[/red]")

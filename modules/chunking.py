@@ -8,11 +8,14 @@ Two strategies:
 
 The section strategy uses separators that match common heading patterns
 in nuclear regulatory documents, in both English and German.
+
+Supports loading multiple document formats (PDF, DOCX, XLSX, Email, TXT)
+via the loaders module.
 """
 from pathlib import Path
-from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
+from modules.loaders import load_document, SUPPORTED_EXTENSIONS
 from config.settings import (
     CHUNK_SIZE,
     CHUNK_OVERLAP,
@@ -44,39 +47,31 @@ def get_splitter(strategy: str = "recursive") -> RecursiveCharacterTextSplitter:
 
 
 def load_pdf(pdf_path: str | Path) -> list[Document]:
-    """Load a PDF and return raw page documents."""
-    pdf_path = Path(pdf_path)
-    if not pdf_path.exists():
-        raise FileNotFoundError(f"PDF not found: {pdf_path}")
-
-    print(f"📄 Loading: {pdf_path.name}")
-    loader = PyPDFLoader(str(pdf_path))
-    pages = loader.load()
-    print(f"   {len(pages)} pages loaded.")
-    return pages
+    """Load a PDF and return raw page documents (kept for backward compat)."""
+    return load_document(Path(pdf_path))
 
 
 def load_and_chunk(
-    pdf_path: str | Path,
+    file_path: str | Path,
     strategy: str = "recursive",
 ) -> list[Document]:
     """
-    Load a PDF and split it into chunks.
+    Load a document (any supported format) and split it into chunks.
 
     Args:
-        pdf_path: Path to the PDF file.
+        file_path: Path to the document file (PDF, DOCX, XLSX, EML, MSG, TXT).
         strategy: "recursive" or "section".
 
     Returns:
         List of Document chunks with metadata.
     """
-    pages = load_pdf(pdf_path)
+    pages = load_document(file_path)
     splitter = get_splitter(strategy)
     chunks = splitter.split_documents(pages)
 
     # Enrich metadata with source filename and strategy used
     for chunk in chunks:
-        chunk.metadata["source_file"] = Path(pdf_path).name
+        chunk.metadata["source_file"] = Path(file_path).name
         chunk.metadata["chunk_strategy"] = strategy
 
     print(f"   Split into {len(chunks)} chunks (strategy: {strategy}).")
@@ -100,19 +95,24 @@ def load_directory(
         Combined list of chunks from all PDFs.
     """
     directory = Path(directory)
-    pdf_files = sorted(directory.glob("*.pdf"))
 
-    if not pdf_files:
-        print(f"⚠️  No PDFs found in {directory}")
+    # Collect all supported file types
+    all_files = []
+    for ext in sorted(SUPPORTED_EXTENSIONS):
+        all_files.extend(directory.glob(f"*{ext}"))
+    all_files = sorted(set(all_files))
+
+    if not all_files:
+        print(f"⚠️  No supported documents found in {directory}")
         return []
 
     all_chunks = []
-    for pdf in pdf_files:
-        if skip_existing and pdf.name in skip_existing:
-            print(f"⏭️  Skipping {pdf.name} (already ingested)")
+    for doc_file in all_files:
+        if skip_existing and doc_file.name in skip_existing:
+            print(f"⏭️  Skipping {doc_file.name} (already ingested)")
             continue
-        chunks = load_and_chunk(pdf, strategy=strategy)
+        chunks = load_and_chunk(doc_file, strategy=strategy)
         all_chunks.extend(chunks)
 
-    print(f"\n📊 Total: {len(all_chunks)} chunks from {len(pdf_files)} PDFs.")
+    print(f"\n📊 Total: {len(all_chunks)} chunks from {len(all_files)} documents.")
     return all_chunks

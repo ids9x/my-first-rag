@@ -16,7 +16,7 @@ from langchain_core.messages import HumanMessage, AIMessage
 from core.query_service import QueryService
 from config.settings import (
     WEB_HOST, WEB_PORT, WEB_SHARE, CHAT_MODEL, EMBED_MODEL,
-    MULTI_TURN_MAX_EXCHANGES,
+    MULTI_TURN_MAX_EXCHANGES, PROMPT_PRESETS, DEFAULT_PROMPT_PRESET,
 )
 
 
@@ -101,6 +101,15 @@ def format_response(result: dict) -> str:
         answer += "\n\n---\n\n**📚 Sources:**\n"
         for i, src in enumerate(sources, 1):
             answer += f"{i}. {src['source']}, page {src['page']}\n"
+
+        # Add collapsible source excerpts for verification
+        previews = [s for s in sources if s.get("content_preview")]
+        if previews:
+            answer += "\n<details>\n<summary><b>📄 Source Excerpts</b></summary>\n\n"
+            for i, src in enumerate(previews, 1):
+                answer += f"**{i}. {src['source']}, p.{src['page']}**\n\n"
+                answer += f"> {src['content_preview']}\n\n"
+            answer += "</details>"
 
     # Append reasoning steps for agentic mode
     reasoning_steps = result.get("reasoning_steps", [])
@@ -226,7 +235,9 @@ def export_chat(chat_history: list):
     return gr.File(value=tmp.name, visible=True)
 
 
-def chat_fn(message: str, history: list, mode: str, chat_history_lc: list | None = None) -> str:
+def chat_fn(message: str, history: list, mode: str,
+            chat_history_lc: list | None = None,
+            system_prompt: str | None = None) -> str:
     """
     Process user message and return response.
 
@@ -235,12 +246,17 @@ def chat_fn(message: str, history: list, mode: str, chat_history_lc: list | None
         history: Chat history (Gradio format, for context)
         mode: Selected query mode
         chat_history_lc: Optional LangChain message list for multi-turn context
+        system_prompt: Optional custom system prompt text
 
     Returns:
         Formatted response string
     """
     if not message.strip():
         return "Please enter a question."
+
+    # Normalize empty prompt to None (use default)
+    if system_prompt is not None and not system_prompt.strip():
+        system_prompt = None
 
     # Check system status
     status = query_service.get_status()
@@ -250,24 +266,29 @@ def chat_fn(message: str, history: list, mode: str, chat_history_lc: list | None
     try:
         # Route to appropriate query method based on mode
         if mode == "Basic (Vector)":
-            result = query_service.query_basic(message, chat_history=chat_history_lc)
+            result = query_service.query_basic(message, chat_history=chat_history_lc,
+                                               system_prompt=system_prompt)
 
         elif mode == "Hybrid (Vector+BM25)":
             if not status["bm25_exists"]:
                 return "⚠️ **BM25 index not found.**\n\nTo enable hybrid search, run:\n```bash\npython -m scripts.ingest --build-bm25\n```"
-            result = query_service.query_hybrid(message, chat_history=chat_history_lc)
+            result = query_service.query_hybrid(message, chat_history=chat_history_lc,
+                                                system_prompt=system_prompt)
 
         elif mode == "Agentic (Multi-step)":
-            result = query_service.query_agentic(message, chat_history=chat_history_lc)
+            result = query_service.query_agentic(message, chat_history=chat_history_lc,
+                                                 system_prompt=system_prompt)
 
         elif mode == "Router (Auto)":
-            result = query_service.query_router(message, chat_history=chat_history_lc)
+            result = query_service.query_router(message, chat_history=chat_history_lc,
+                                                system_prompt=system_prompt)
 
         elif mode == "Map-Reduce":
-            result = query_service.query_map_reduce(message)
+            result = query_service.query_map_reduce(message, system_prompt=system_prompt)
 
         elif mode == "Parallel + Merge":
-            result = query_service.query_parallel(message, chat_history=chat_history_lc)
+            result = query_service.query_parallel(message, chat_history=chat_history_lc,
+                                                  system_prompt=system_prompt)
 
         else:
             return f"❌ Unknown mode: {mode}"
@@ -301,13 +322,18 @@ def create_interface():
     status_md = "\n\n".join(status_lines)
 
     # Helper function for chat interactions (streaming)
-    def respond(message, chat_history, query_mode, multi_turn):
+    def respond(message, chat_history, query_mode, multi_turn, system_prompt_text):
         """Handle user message and stream response token by token."""
         if not message.strip():
             yield chat_history, ""
             return
 
         chat_history.append({"role": "user", "content": message})
+
+        # Normalize system prompt (empty string → None → use default)
+        sys_prompt = system_prompt_text.strip() if system_prompt_text else None
+        if not sys_prompt:
+            sys_prompt = None
 
         # Build LangChain chat history for multi-turn context
         chat_history_lc = None
@@ -330,7 +356,8 @@ def create_interface():
                 chat_history.append({"role": "assistant", "content": _thinking_message(query_mode)})
                 yield chat_history, ""
 
-                response = chat_fn(message, chat_history, query_mode, chat_history_lc)
+                response = chat_fn(message, chat_history, query_mode,
+                                   chat_history_lc, system_prompt=sys_prompt)
                 chat_history[-1]["content"] = response
                 yield chat_history, ""
                 return
@@ -339,6 +366,7 @@ def create_interface():
             if query_mode == "Basic (Vector)":
                 stream = query_service.query_basic_stream(
                     message, chat_history=chat_history_lc,
+                    system_prompt=sys_prompt,
                 )
             elif query_mode == "Hybrid (Vector+BM25)":
                 if not status["bm25_exists"]:
@@ -347,6 +375,7 @@ def create_interface():
                     return
                 stream = query_service.query_hybrid_stream(
                     message, chat_history=chat_history_lc,
+                    system_prompt=sys_prompt,
                 )
             else:
                 chat_history.append({"role": "assistant", "content": f"❌ Unknown mode: {query_mode}"})
@@ -406,7 +435,7 @@ def create_interface():
         """,
         head='<style id="dynamic-font-style"></style>',
     ) as demo:
-        gr.Markdown("# 🔬 Nuclear RAG System")
+        gr.Markdown("# 🔬 RAG System")
         gr.Markdown("Ask questions about the document corpus")
 
         # Status panel (collapsible)
@@ -427,6 +456,34 @@ def create_interface():
             label="Query Mode",
             info="Basic: Semantic search | Hybrid: Vector + keywords | Agentic: Multi-step | Router: Auto-selects | Map-Reduce: Per-chunk analysis | Parallel: Multi-strategy"
         )
+
+        # System prompt preset selector + custom editor
+        with gr.Accordion("🎯 System Prompt", open=False):
+            preset_names = list(PROMPT_PRESETS.keys())
+            prompt_preset = gr.Dropdown(
+                choices=preset_names,
+                value=DEFAULT_PROMPT_PRESET,
+                label="Preset",
+                info="Select a preset or edit the text below to customise",
+            )
+            system_prompt_text = gr.Textbox(
+                label="Active System Prompt",
+                value=PROMPT_PRESETS[DEFAULT_PROMPT_PRESET],
+                lines=5,
+                max_lines=10,
+                info="Edit this text to change how the LLM responds. "
+                     "Selecting a preset above will replace this text.",
+            )
+
+            def on_preset_change(preset_name):
+                """When a preset is selected, populate the text area."""
+                return PROMPT_PRESETS.get(preset_name, "")
+
+            prompt_preset.change(
+                fn=on_preset_change,
+                inputs=prompt_preset,
+                outputs=system_prompt_text,
+            )
 
         # FAQ: when to use each mode (collapsible)
         with gr.Accordion("❓ Which Query Mode Should I Use?", open=False):
@@ -534,8 +591,8 @@ def create_interface():
                                js=font_size_js)
 
         # Connect components
-        submit.click(respond, [msg, chatbot, mode, multi_turn], [chatbot, msg])
-        msg.submit(respond, [msg, chatbot, mode, multi_turn], [chatbot, msg])
+        submit.click(respond, [msg, chatbot, mode, multi_turn, system_prompt_text], [chatbot, msg])
+        msg.submit(respond, [msg, chatbot, mode, multi_turn, system_prompt_text], [chatbot, msg])
         clear.click(
             lambda: ([], "", gr.File(visible=False)),
             None, [chatbot, msg, export_file], queue=False,

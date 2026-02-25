@@ -127,7 +127,8 @@ def merge_and_deduplicate(
     return merged_docs, strategy_counts
 
 
-def parallel_merge_query(question: str, query_service, chat_history=None) -> dict:
+def parallel_merge_query(question: str, query_service, chat_history=None,
+                         system_prompt=None) -> dict:
     """Full parallel + merge pipeline.
 
     Runs multiple retrieval strategies concurrently, merges their results,
@@ -240,7 +241,7 @@ def parallel_merge_query(question: str, query_service, chat_history=None) -> dic
 
     # Build context and send to LLM (same prompt as basic/hybrid modes)
     context = "\n\n---\n\n".join(doc.page_content for doc in merged_docs)
-    prompt = get_prompt()
+    prompt = get_prompt(system_prompt)
     llm = get_llm()
 
     # Format the prompt with context, question, and optional chat history

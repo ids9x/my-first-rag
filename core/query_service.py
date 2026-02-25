@@ -64,6 +64,7 @@ class QueryService:
         self._basic_chain = None
         self._hybrid_chain = None
         self._agent = None
+        self._current_system_prompt = None  # Track prompt for cache invalidation
 
     def get_status(self) -> dict:
         """
@@ -109,15 +110,23 @@ class QueryService:
             sources.append({
                 "source": doc.metadata.get("source_file", doc.metadata.get("source", "unknown")),
                 "page": doc.metadata.get("page", "?"),
-                "content_preview": doc.page_content[:150] + "..." if len(doc.page_content) > 150 else doc.page_content,
+                "content_preview": doc.page_content[:300] + "..." if len(doc.page_content) > 300 else doc.page_content,
             })
         return sources
 
-    def _ensure_basic_chain(self):
+    def _invalidate_chains_if_prompt_changed(self, system_prompt: str | None):
+        """Invalidate cached chains if the system prompt has changed."""
+        if system_prompt != self._current_system_prompt:
+            self._basic_chain = None
+            self._hybrid_chain = None
+            self._current_system_prompt = system_prompt
+
+    def _ensure_basic_chain(self, system_prompt: str | None = None):
         """Build basic chain if not cached."""
+        self._invalidate_chains_if_prompt_changed(system_prompt)
         if self._basic_chain is None:
             retriever = self._get_retriever_with_reranking()
-            prompt = get_prompt()
+            prompt = get_prompt(system_prompt)
             llm = get_llm()
 
             self._basic_chain = (
@@ -132,13 +141,15 @@ class QueryService:
             )
             self._basic_retriever = retriever
 
-    def query_basic(self, question: str, chat_history: list | None = None) -> dict:
+    def query_basic(self, question: str, chat_history: list | None = None,
+                    system_prompt: str | None = None) -> dict:
         """
         Execute basic vector search query.
 
         Args:
             question: User question
             chat_history: Optional LangChain message list for multi-turn context
+            system_prompt: Optional custom system prompt text
 
         Returns:
             dict with:
@@ -149,7 +160,7 @@ class QueryService:
         if not self.manager.exists:
             raise ValueError("Vector store not found. Run: python -m scripts.ingest")
 
-        self._ensure_basic_chain()
+        self._ensure_basic_chain(system_prompt)
 
         # Execute query
         input_dict = {"question": question, "chat_history": chat_history or []}
@@ -165,7 +176,8 @@ class QueryService:
             "mode": "basic",
         }
 
-    def query_basic_stream(self, question: str, chat_history: list | None = None):
+    def query_basic_stream(self, question: str, chat_history: list | None = None,
+                           system_prompt: str | None = None):
         """
         Stream basic vector search query token by token.
 
@@ -174,7 +186,7 @@ class QueryService:
         if not self.manager.exists:
             raise ValueError("Vector store not found. Run: python -m scripts.ingest")
 
-        self._ensure_basic_chain()
+        self._ensure_basic_chain(system_prompt)
 
         # Stream tokens
         input_dict = {"question": question, "chat_history": chat_history or []}
@@ -188,13 +200,14 @@ class QueryService:
         sources = self._extract_sources(docs)
         yield {"answer": answer, "sources": sources, "mode": "basic"}
 
-    def _ensure_hybrid_chain(self):
+    def _ensure_hybrid_chain(self, system_prompt: str | None = None):
         """Build hybrid chain if not cached."""
         if not self.manager.exists:
             raise ValueError("Vector store not found. Run: python -m scripts.ingest")
         if self.bm25_index is None:
             raise ValueError("BM25 index not found. Run: python -m scripts.ingest --build-bm25")
 
+        self._invalidate_chains_if_prompt_changed(system_prompt)
         if self._hybrid_chain is None:
             retriever = HybridRetriever(
                 vector_retriever=self.manager.get_retriever(k=RETRIEVER_K * 2),
@@ -202,7 +215,7 @@ class QueryService:
                 k=RETRIEVER_K,
                 reranker=self.reranker,
             )
-            prompt = get_prompt()
+            prompt = get_prompt(system_prompt)
             llm = get_llm()
 
             self._hybrid_chain = (
@@ -217,13 +230,15 @@ class QueryService:
             )
             self._hybrid_retriever = retriever
 
-    def query_hybrid(self, question: str, chat_history: list | None = None) -> dict:
+    def query_hybrid(self, question: str, chat_history: list | None = None,
+                     system_prompt: str | None = None) -> dict:
         """
         Execute hybrid (vector + BM25) search query.
 
         Args:
             question: User question
             chat_history: Optional LangChain message list for multi-turn context
+            system_prompt: Optional custom system prompt text
 
         Returns:
             dict with:
@@ -231,7 +246,7 @@ class QueryService:
                 - sources: list[dict]
                 - mode: "hybrid"
         """
-        self._ensure_hybrid_chain()
+        self._ensure_hybrid_chain(system_prompt)
 
         # Execute query
         input_dict = {"question": question, "chat_history": chat_history or []}
@@ -247,13 +262,14 @@ class QueryService:
             "mode": "hybrid",
         }
 
-    def query_hybrid_stream(self, question: str, chat_history: list | None = None):
+    def query_hybrid_stream(self, question: str, chat_history: list | None = None,
+                            system_prompt: str | None = None):
         """
         Stream hybrid search query token by token.
 
         Yields partial answer strings, then yields the final dict with sources.
         """
-        self._ensure_hybrid_chain()
+        self._ensure_hybrid_chain(system_prompt)
 
         # Stream tokens
         input_dict = {"question": question, "chat_history": chat_history or []}
@@ -267,7 +283,8 @@ class QueryService:
         sources = self._extract_sources(docs)
         yield {"answer": answer, "sources": sources, "mode": "hybrid"}
 
-    def query_agentic(self, question: str, chat_history: list | None = None) -> dict:
+    def query_agentic(self, question: str, chat_history: list | None = None,
+                      system_prompt: str | None = None) -> dict:
         """
         Execute agentic (multi-step reasoning) query.
 
@@ -328,7 +345,8 @@ class QueryService:
             "mode": "agentic",
         }
 
-    def query_router(self, question: str, chat_history: list | None = None) -> dict:
+    def query_router(self, question: str, chat_history: list | None = None,
+                     system_prompt: str | None = None) -> dict:
         """Auto-route to best pipeline via LLM classification.
 
         Uses a lightweight LLM call to classify the question type, then
@@ -348,9 +366,10 @@ class QueryService:
         """
         from modules.router import route_and_execute  # lazy import
 
-        return route_and_execute(question, self, chat_history=chat_history)
+        return route_and_execute(question, self, chat_history=chat_history,
+                                system_prompt=system_prompt)
 
-    def query_map_reduce(self, question: str) -> dict:
+    def query_map_reduce(self, question: str, system_prompt: str | None = None) -> dict:
         """Map-reduce: LLM processes each chunk independently, then synthesises.
 
         Retrieves MAP_REDUCE_FETCH_K chunks (more than standard), runs a
@@ -398,7 +417,8 @@ class QueryService:
 
         return map_reduce_query(question, retriever, llm)
 
-    def query_parallel(self, question: str, chat_history: list | None = None) -> dict:
+    def query_parallel(self, question: str, chat_history: list | None = None,
+                       system_prompt: str | None = None) -> dict:
         """Parallel retrieval + merge: broadest coverage from multiple strategies.
 
         Runs vector, hybrid, and reranked retrieval concurrently, merges
@@ -421,4 +441,5 @@ class QueryService:
         if not self.manager.exists:
             raise ValueError("Vector store not found. Run: python -m scripts.ingest")
 
-        return parallel_merge_query(question, self, chat_history=chat_history)
+        return parallel_merge_query(question, self, chat_history=chat_history,
+                                    system_prompt=system_prompt)

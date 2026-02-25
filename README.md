@@ -1,6 +1,6 @@
 # 🚀 Advanced RAG Pipeline
 
-A modular, production-ready Retrieval-Augmented Generation (RAG) system designed for nuclear regulatory documents (NQA-1, ASME, IAEA standards). Features six query modes including LLM-driven query routing, map-reduce analysis, parallel multi-strategy retrieval, cross-encoder reranking, and agentic reasoning.
+A modular, production-ready Retrieval-Augmented Generation (RAG) system supporting multi-format document ingestion (PDF, DOCX, XLSX, Email, TXT) with configurable system prompts. Originally designed for nuclear regulatory documents (NQA-1, ASME, IAEA standards) and now extended for Dispute Resolution Board (DRB) engagements. Features six query modes including LLM-driven query routing, map-reduce analysis, parallel multi-strategy retrieval, cross-encoder reranking, and agentic reasoning.
 
 ---
 
@@ -62,8 +62,9 @@ curl http://localhost:8080/v1/models
 ### 3. Add Your Documents
 
 \`\`\`bash
-# Place your PDF documents in the data/ folder
-cp /path/to/your/*.pdf data/
+# Place your documents in the data/ folder
+# Supported formats: PDF, DOCX, XLSX, Email (.eml/.msg), TXT
+cp /path/to/your/documents/* data/
 \`\`\`
 
 ### 4. Ingest Documents
@@ -151,8 +152,9 @@ my-first-rag/
 │   ├── chunking.py     # Document chunking strategies
 │   ├── hybrid_search.py # Vector + BM25 hybrid search
 │   ├── knowledge_graph.py # Knowledge graph extraction
+│   ├── loaders.py      # Multi-format document loaders (PDF, DOCX, XLSX, Email, TXT)
 │   ├── map_reduce.py   # Map-reduce per-chunk analysis
-│   ├── multilingual.py # Multilingual support
+│   ├── multilingual.py # Configurable prompt templates
 │   ├── parallel.py     # Parallel multi-strategy retrieval
 │   ├── reranking.py    # Cross-encoder reranking
 │   └── router.py       # LLM query classifier + auto-dispatch
@@ -160,7 +162,7 @@ my-first-rag/
 │   ├── ingest.py       # Document ingestion
 │   ├── query.py        # Query interface
 │   └── reset_store.py  # Reset vector store
-├── data/               # Your PDF documents
+├── data/               # Your documents (PDF, DOCX, XLSX, Email, TXT)
 ├── chroma_db/          # Vector database (generated)
 ├── bm25_index.pkl      # BM25 index (generated)
 ├── app.py              # Gradio web interface
@@ -566,17 +568,18 @@ AGENT_TEMPERATURE = 0.1      # Low = factual, High = creative
 │   ├── chunking.py           # Text splitting strategies
 │   ├── hybrid_search.py      # BM25 + Vector fusion
 │   ├── reranking.py          # Cross-encoder reranker
-│   ├── multilingual.py       # Prompt templates
+│   ├── multilingual.py       # Configurable prompt templates
+│   ├── loaders.py            # Multi-format document loaders
 │   ├── agentic.py            # Multi-step reasoning
 │   ├── router.py             # LLM query classifier + auto-dispatch
 │   ├── map_reduce.py         # Per-chunk map + reduce synthesis
 │   ├── parallel.py           # Multi-strategy concurrent retrieval
 │   └── knowledge_graph.py    # Entity extraction
 ├── scripts/
-│   ├── ingest.py             # PDF → Vector store
+│   ├── ingest.py             # Documents → Vector store
 │   ├── query.py              # Interactive querying
 │   └── reset_store.py        # Clear database
-├── data/                     # 📄 Your PDFs here
+├── data/                     # 📄 Your documents here (PDF, DOCX, XLSX, Email, TXT)
 ├── chroma_db/                # 🗄️ Persistent vector store
 ├── bm25_index.pkl            # Keyword search index
 └── requirements.txt
@@ -903,6 +906,8 @@ for query in queries:
 **Progress Indicators** — Non-streaming modes (Router, Agentic, Map-Reduce, Parallel) show a mode-specific status message while processing, so you know the system is working during longer queries.
 
 **Multi-turn Context** — Enable the **Multi-turn context** checkbox to pass recent chat history (up to 5 exchanges) to the LLM. This allows natural follow-up questions like "What are its key requirements?" after asking about a specific standard. Uncheck to return to stateless queries at any time. The **Clear** button resets all context. Multi-turn is supported in all modes except Map-Reduce (which processes chunks independently).
+
+**System Prompt Switching** — Expand the **System Prompt** accordion to select a preset (e.g., "Nuclear Technical" or "DRB Expert") or write a fully custom system prompt. The active prompt is editable in-place and applies to all query modes. Custom presets can be added in `config/settings.py` under `PROMPT_PRESETS`.
 
 > ⚠️ When adding BM25 to an existing store, **always specify the same chunking strategy** used during initial ingestion to avoid duplicate chunks.
 

@@ -110,3 +110,23 @@ PARALLEL_MAX_WORKERS = 3         # One thread per strategy
 # Multi-turn Context
 # =============================================================================
 MULTI_TURN_MAX_EXCHANGES = 5     # Max Q&A pairs passed to LLM for follow-ups
+
+# =============================================================================
+# System Prompt Presets (selectable in Gradio UI)
+# =============================================================================
+PROMPT_PRESETS = {
+    "Nuclear Technical": (
+        "You are a helpful assistant specializing in nuclear regulatory documents.\n"
+        "Answer the question based ONLY on the following context.\n"
+        "If the context does not contain enough information, say so."
+    ),
+    "DRB Expert": (
+        "You are a technical expert assistant reviewing documents for a Dispute Resolution Board.\n"
+        "The case involves nuclear components (valves, piping, leakage) and technical specifications.\n"
+        "Answer the question based ONLY on the following context from the case documentation.\n"
+        "Always cite specific document references (document name, section/clause, page number).\n"
+        "When documents present conflicting information, note the discrepancy.\n"
+        "If the context does not contain enough information, say so."
+    ),
+}
+DEFAULT_PROMPT_PRESET = "Nuclear Technical"

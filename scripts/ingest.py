@@ -1,8 +1,10 @@
 """
-Ingest PDFs into the vector store.
+Ingest documents into the vector store.
+
+Supports PDF, DOCX, XLSX, Email (.eml/.msg), and TXT files.
 
 Usage:
-    python -m scripts.ingest                          # Ingest all PDFs in data/
+    python -m scripts.ingest                          # Ingest all documents in data/
     python -m scripts.ingest --strategy section        # Use section-aware chunking
     python -m scripts.ingest --force                   # Re-ingest everything
     python -m scripts.ingest --build-bm25              # Also build BM25 index
@@ -24,7 +26,7 @@ from config.settings import DATA_DIR
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Ingest PDFs into the RAG pipeline")
+    parser = argparse.ArgumentParser(description="Ingest documents (PDF, DOCX, XLSX, Email, TXT) into the RAG pipeline")
     parser.add_argument(
         "--strategy",
         choices=["recursive", "section"],
@@ -68,7 +70,7 @@ def main():
         if skip:
             print("✅ All documents already ingested. Use --force to re-ingest.")
         else:
-            print(f"❌ No PDFs found in {DATA_DIR}. Add PDFs and try again.")
+            print(f"❌ No supported documents found in {DATA_DIR}. Add files and try again.")
         return
 
     # Add to vector store

@@ -1,25 +1,31 @@
 """
-English Prompt Template
+Prompt Templates
 
-This module contains the prompt template for English-only RAG queries.
-Previously supported multilingual features but now simplified for English only.
+Builds the RAG prompt template with a configurable system prompt.
+Supports preset prompts (defined in config/settings.py) and
+fully custom system prompts passed from the UI at query time.
 """
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
-
-# ── English Prompt Template ────────────────────────────────────
-
-PROMPT_EN = ChatPromptTemplate.from_messages([
-    ("system",
-     "You are a helpful assistant specializing in nuclear regulatory documents.\n"
-     "Answer the question based ONLY on the following context.\n"
-     "If the context does not contain enough information, say so.\n\n"
-     "Context:\n{context}"),
-    MessagesPlaceholder("chat_history", optional=True),
-    ("human", "{question}"),
-])
+from config.settings import PROMPT_PRESETS, DEFAULT_PROMPT_PRESET
 
 
-def get_prompt() -> ChatPromptTemplate:
-    """Return the English prompt template."""
-    return PROMPT_EN
+def get_prompt(system_prompt: str | None = None) -> ChatPromptTemplate:
+    """
+    Return a prompt template with the given system prompt.
+
+    Args:
+        system_prompt: Custom system prompt text. If None or empty,
+                       uses the default preset from config.
+
+    Returns:
+        ChatPromptTemplate with system, chat_history, and human messages.
+    """
+    if not system_prompt:
+        system_prompt = PROMPT_PRESETS[DEFAULT_PROMPT_PRESET]
+
+    return ChatPromptTemplate.from_messages([
+        ("system", system_prompt + "\n\nContext:\n{context}"),
+        MessagesPlaceholder("chat_history", optional=True),
+        ("human", "{question}"),
+    ])
