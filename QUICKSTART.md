@@ -6,16 +6,16 @@
 # Terminal 1: Ollama (embeddings)
 ollama serve &
 
-# Terminal 2: llama-server (chat LLM)
-~/start-llama-server.sh
-# Wait for "listening on 0.0.0.0:8080"
+# Terminal 2: llama-server (chat LLM) — from the project root
+./start-llama-server.sh
+# Wait for "listening on 0.0.0.0:8081"
 ```
 
 Verify both are running:
 
 ```bash
 curl http://localhost:11434/api/tags       # Ollama
-curl http://localhost:8080/v1/models       # llama-server
+curl http://localhost:8081/v1/models       # llama-server
 ```
 
 ## 2. Activate Environment

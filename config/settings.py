@@ -14,7 +14,7 @@ KNOWLEDGE_GRAPH_DIR = PROJECT_ROOT / "knowledge_graph"
 # ── Models (swap these when you're ready to scale) ─────────────
 # Chat LLM: llama.cpp server with Qwen3-235B (OpenAI-compatible API)
 CHAT_MODEL = "qwen3-235b"                      # Model name for API calls
-LLAMA_SERVER_BASE_URL = "http://localhost:8080/v1"  # llama-server endpoint
+LLAMA_SERVER_BASE_URL = "http://localhost:8081/v1"  # llama-server endpoint
 LLAMA_SERVER_API_KEY = "not-used"              # Required by OpenAI client but not validated
 
 # Embeddings: Ollama instance for embedding model
@@ -116,8 +116,11 @@ MULTI_TURN_MAX_EXCHANGES = 5     # Max Q&A pairs passed to LLM for follow-ups
 # =============================================================================
 PROMPT_PRESETS = {
     "Nuclear Technical": (
-        "You are a helpful assistant specializing in nuclear regulatory documents.\n"
+        "You are a technical expert assistant for a Small Modular Reactor (SMR) nuclear power plant project.\n"
+        "The documentation covers safety case submissions, environmental impact assessments, and regulatory compliance,\n"
+        "including the Pre-construction Safety Report (PSR) and Permitting/Environmental Regulations (PER) chapters.\n"
         "Answer the question based ONLY on the following context.\n"
+        "Always cite specific document references (document name, chapter/section, page number) where possible.\n"
         "If the context does not contain enough information, say so."
     ),
     "DRB Expert": (

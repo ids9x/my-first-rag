@@ -133,9 +133,17 @@ class VectorStoreManager:
     def get_source_files(self) -> set[str]:
         """Return the set of source filenames already in the store."""
         store = self.get_store()
-        results = store.get(include=["metadatas"])
+        collection = store._collection
+        total = collection.count()
+        batch_size = 5000
         sources = set()
-        for meta in results.get("metadatas", []):
-            if meta and "source" in meta:
-                sources.add(meta["source"])
+        for offset in range(0, total, batch_size):
+            batch = collection.get(
+                limit=batch_size,
+                offset=offset,
+                include=["metadatas"],
+            )
+            for meta in batch.get("metadatas", []):
+                if meta and "source" in meta:
+                    sources.add(meta["source"])
         return sources

@@ -80,15 +80,24 @@ def main():
     if args.build_bm25:
         print("\n🔤 Building BM25 keyword index...")
         # Need ALL chunks for BM25, not just new ones
+        # Fetch in batches to avoid SQLite variable limit
         store = manager.get_store()
-        all_results = store.get(include=["documents", "metadatas"])
-
+        collection = store._collection
+        total = collection.count()
+        batch_size = 5000
         all_docs = []
-        for content, metadata in zip(
-            all_results.get("documents", []),
-            all_results.get("metadatas", []),
-        ):
-            all_docs.append(Document(page_content=content, metadata=metadata))
+        for offset in range(0, total, batch_size):
+            batch = collection.get(
+                limit=batch_size,
+                offset=offset,
+                include=["documents", "metadatas"],
+            )
+            for content, metadata in zip(
+                batch.get("documents", []),
+                batch.get("metadatas", []),
+            ):
+                all_docs.append(Document(page_content=content, metadata=metadata))
+            print(f"   Loaded {min(offset + batch_size, total)}/{total} chunks...")
 
         bm25 = BM25Index(all_docs)
         bm25.save()

@@ -69,7 +69,7 @@ All components are written in Python 3.12 and orchestrated through LangChain. Th
 | Role | Model | Parameters | Provider | Endpoint |
 |------|-------|-----------|----------|----------|
 | Embeddings | `mxbai-embed-large` | — | Ollama | `localhost:11434` |
-| Chat LLM | `qwen3-235b` | 235B (MoE) | llama-server (llama.cpp) | `localhost:8080/v1` |
+| Chat LLM | `qwen3-235b` | 235B (MoE) | llama-server (llama.cpp) | `localhost:8081/v1` |
 | Reranker | `Qwen/Qwen3-Reranker-4B` | 4B | Hugging Face / local | In-process (PyTorch) |
 
 ### Persistent Storage
@@ -386,7 +386,7 @@ The system requires two inference servers running at query time:
 | Service | Port | Protocol | Purpose |
 |---------|------|----------|---------|
 | **Ollama** | 11434 | HTTP (Ollama API) | Serves the `mxbai-embed-large` embedding model |
-| **llama-server** | 8080 | HTTP (OpenAI-compatible `/v1`) | Serves the `qwen3-235b` chat model via llama.cpp |
+| **llama-server** | 8081 | HTTP (OpenAI-compatible `/v1`) | Serves the `qwen3-235b` chat model via llama.cpp |
 
 The reranker model (`Qwen3-Reranker-4B`) runs in-process using PyTorch and does not require a separate server.
 

@@ -45,11 +45,11 @@ The chat model (Qwen3-235B) runs via **llama-server** (llama.cpp), which is sepa
 
 \`\`\`bash
 # Start llama-server (loads the Qwen3-235B model onto GPU)
-~/start-llama-server.sh
-# Wait until you see "listening on 0.0.0.0:8080" before proceeding
+./start-llama-server.sh
+# Wait until you see "listening on 0.0.0.0:8081" before proceeding
 
 # In another terminal, verify it's running:
-curl http://localhost:8080/v1/models
+curl http://localhost:8081/v1/models
 \`\`\`
 
 > **Architecture:** This system uses two servers that must both be running:
@@ -57,7 +57,7 @@ curl http://localhost:8080/v1/models
 > | Server | Port | Purpose | Start command |
 > |--------|------|---------|---------------|
 > | Ollama | 11434 | Embeddings (`mxbai-embed-large`) | `ollama serve` |
-> | llama-server | 8080 | Chat LLM (`qwen3-235b` via llama.cpp) | `~/start-llama-server.sh` |
+> | llama-server | 8081 | Chat LLM (`qwen3-235b` via llama.cpp) | `./start-llama-server.sh` |
 
 ### 3. Add Your Documents
 
