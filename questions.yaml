@@ -1,0 +1,21 @@
+# Batch query configuration
+# Usage:
+#   python3 -m scripts.batch_query classify questions.yaml   # Step 1: auto-assign modes
+#   python3 -m scripts.batch_query run questions.yaml         # Step 2: execute and get results
+
+settings:
+  preset: "Nuclear Technical"     # or "DRB Expert"
+  # system_prompt: "..."          # alternative: raw custom prompt text
+  output_dir: results/            # where JSON + CSV results are written
+
+questions:
+  # Simple strings → will be classified by the 'classify' command
+  - What are the primary containment boundary specifications?
+  - What dose limits apply to workers during normal operations?
+  - Compare NQA-1 and ISO 19443 quality requirements
+  - What are the consequences of non-conformance in nuclear procurement?
+  - Summarise the key safety objectives across all PSR chapters
+
+  # You can also pre-assign modes manually:
+  # - question: Trace the full safety analysis methodology
+  #   mode: agentic
