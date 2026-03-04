@@ -1,21 +1,157 @@
-# Batch query configuration
-# Usage:
-#   python3 -m scripts.batch_query classify questions.yaml   # Step 1: auto-assign modes
-#   python3 -m scripts.batch_query run questions.yaml         # Step 2: execute and get results
-
 settings:
-  preset: "Nuclear Technical"     # or "DRB Expert"
-  # system_prompt: "..."          # alternative: raw custom prompt text
-  output_dir: results/            # where JSON + CSV results are written
-
+  preset: Nuclear Technical
+  output_dir: results/
 questions:
-  # Simple strings → will be classified by the 'classify' command
-  - What are the primary containment boundary specifications?
-  - What dose limits apply to workers during normal operations?
-  - Compare NQA-1 and ISO 19443 quality requirements
-  - What are the consequences of non-conformance in nuclear procurement?
-  - Summarise the key safety objectives across all PSR chapters
-
-  # You can also pre-assign modes manually:
-  # - question: Trace the full safety analysis methodology
-  #   mode: agentic
+- question: How are nuclear incidents defined and categorized in terms of their potential to cause elevated radiation levels,
+    acute radioactive contamination, or impairment of facility operation and safety, and how are these distinguished from
+    other undesirable events affecting humans, the environment, society, or security of power supply?
+  mode: map_reduce
+  classification_reasoning: The question requires a comprehensive analysis across multiple document sections to define and
+    categorize nuclear incidents, distinguish them from other events, and address implications for safety, environment, and
+    security, making full coverage and integration of information essential.
+- question: What types of undesirable events originating outside the nuclear facility project area — such as fire, explosion,
+    or industrial hazards from neighbouring facilities — have been identified and assessed?
+  mode: basic
+  classification_reasoning: The question asks for a specific list of externally originating undesirable events that have been
+    identified and assessed, which is a direct factual inquiry best answered by retrieving relevant sections from the document.
+- question: What intentional adverse events have been identified and assessed for the nuclear facility, including theft of
+    nuclear material, sabotage or threats of sabotage, explosions, physical disabling of safety functions, cyberattacks, and
+    acts of terrorism?
+  mode: map_reduce
+  classification_reasoning: The question requires a comprehensive analysis across multiple document sections to identify and
+    assess various types of intentional adverse events, making it necessary to evaluate all relevant chunks thoroughly.
+- question: How are intentional adverse events assessed under different security conditions, including peacetime, armed conflict,
+    and wartime?
+  mode: map_reduce
+  classification_reasoning: The question requires a comprehensive analysis across multiple document sections covering different
+    security conditions and their impact on assessing intentional adverse events, necessitating thorough cross-context evaluation.
+- question: What Beyond Design Basis Accident (BDBA) scenarios have been identified for the nuclear facility, what are their
+    postulated initiating events, and what are the assessed consequences?
+  mode: map_reduce
+  classification_reasoning: This question requires a comprehensive analysis across multiple document sections to identify
+    all BDBA scenarios, their initiating events, and consequences, making thorough cross-referencing essential.
+- question: What Design Basis Accident (DBA) scenarios have been evaluated, what design provisions or engineered safety features
+    are credited for managing these events, and what are the assessed consequences?
+  mode: map_reduce
+  classification_reasoning: The question requires a comprehensive analysis across multiple document sections to identify all
+    DBA scenarios, associated design provisions, and consequences, making it essential to evaluate every relevant chunk to
+    avoid missing critical information.
+- question: What Anticipated Operational Occurrences (AOOs) have been identified as expected during the facility's operational
+    lifetime, and what are their assessed radiological consequences?
+  mode: map_reduce
+  classification_reasoning: This question requires a comprehensive analysis across multiple document sections to identify
+    all AOOs and their radiological consequences, where missing any part could result in an incomplete or inaccurate answer.
+- question: How do the assessed radiological consequences of Anticipated Operational Occurrences compare to applicable regulatory
+    limits for radioactive emissions and radiation doses to workers and the public?
+  mode: map_reduce
+  classification_reasoning: The question requires a comprehensive analysis across multiple document sections to compare radiological
+    consequences with regulatory limits, involving detailed evaluation of safety assessments and regulations that may be spread
+    throughout the documentation.
+- question: How have consequences and risk-reducing or mitigating measures been evaluated against the requirements of IAEA
+    Safety Standard GSR Part 7 Preparedness and Response for a Nuclear or Radiological Emergency?
+  mode: map_reduce
+  classification_reasoning: The question requires a comprehensive analysis across multiple sections of IAEA Safety Standard
+    GSR Part 7 to evaluate how consequences and mitigating measures align with its requirements, necessitating thorough cross-document
+    synthesis.
+- question: How is traceability demonstrated between the emergency preparedness and response provisions and the specific requirements
+    of IAEA GSR Part 7?
+  mode: map_reduce
+  classification_reasoning: The question requires a comprehensive analysis across multiple document sections to establish
+    traceability between emergency preparedness provisions and specific requirements in IAEA GSR Part 7, making it essential
+    to examine and connect information from various parts of the document.
+- question: How has guidance from IAEA SSG-77 Protection Against Internal and External Hazards in the Operation of Nuclear
+    Power Plants been applied, particularly regarding internal hazards (fire, flooding, internal missiles) and external hazards
+    (seismic, meteorological, human-induced events)?
+  mode: map_reduce
+  classification_reasoning: The question requires a comprehensive analysis of how specific guidance from IAEA SSG-77 has been
+    applied across multiple hazard types, necessitating thorough examination of various document sections to ensure complete
+    and accurate coverage.
+- question: What Risk and Vulnerability Analysis (ROS analysis) has been performed for the nuclear facility, and where is
+    it documented as a distinct assessment?
+  mode: basic
+  classification_reasoning: This question asks for a specific document or location where a distinct Risk and Vulnerability
+    Analysis (ROS analysis) is documented, which is a direct factual lookup.
+- question: What nuclear incidents (e.g., radiological releases, criticality events, loss of cooling) and other undesirable
+    events (e.g., fire, explosion, loss of external power) have been identified in the Risk and Vulnerability Analysis, and
+    what are the assessed consequences of each?
+  mode: map_reduce
+  classification_reasoning: This question requires a comprehensive analysis of multiple incident types and their consequences
+    across potentially many sections of the Risk and Vulnerability Analysis, necessitating thorough review of all relevant
+    document chunks to ensure complete and accurate reporting.
+- question: What internal risk and vulnerability factors (e.g., equipment failure, human error, internal flooding) and external
+    risk and vulnerability factors (e.g., seismic activity, extreme weather, aircraft impact, third-party industrial hazards)
+    have been assessed for the proposed nuclear facility site?
+  mode: map_reduce
+  classification_reasoning: The question requires a comprehensive analysis of both internal and external risk factors across
+    multiple document sections, where missing any part could result in an incomplete assessment, necessitating thorough review
+    of all relevant chunks.
+- question: What international best-practice frameworks or methodologies have been applied in the Risk and Vulnerability Analysis,
+    and how is alignment with those frameworks demonstrated?
+  mode: map_reduce
+  classification_reasoning: The question requires a comprehensive analysis across multiple document sections to identify and
+    explain the application and alignment with various international frameworks, making it essential to evaluate all relevant
+    chunks for a complete answer.
+- question: How has the potential impact of the nuclear facility on the surrounding environment been assessed, including radiological
+    and non-radiological effects on ecosystems, water resources, air quality, and nearby populations?
+  mode: map_reduce
+  classification_reasoning: The question requires a comprehensive analysis across multiple document sections covering environmental,
+    radiological, and societal impacts, where missing any part could compromise the completeness of the response.
+- question: How has the potential impact of the nuclear facility on the security and reliability of the regional power supply
+    been assessed, including both the facility's contribution to and its vulnerabilities within the electrical grid?
+  mode: map_reduce
+  classification_reasoning: The question requires a comprehensive analysis across multiple document sections to assess both
+    contributions and vulnerabilities of the nuclear facility to the grid, making it essential to evaluate information from
+    various parts of the documentation thoroughly.
+- question: What recognized risk and vulnerability analysis methodology has been applied, and how is the choice of methodology
+    justified as appropriate for nuclear facility hazard assessment?
+  mode: map_reduce
+  classification_reasoning: The question requires a comprehensive analysis across multiple document sections to identify the
+    specific risk methodology used and justify its appropriateness for nuclear facilities, necessitating thorough evaluation
+    of potentially dispersed information.
+- question: How is the risk and vulnerability analysis methodology described in terms of assumptions, data sources, probability
+    classifications, and consequence criteria, and is sufficient detail provided to allow independent review?
+  mode: map_reduce
+  classification_reasoning: The question requires a comprehensive analysis across multiple sections of a document to evaluate
+    the methodology's components and sufficiency for independent review, necessitating thorough attention to all relevant
+    chunks.
+- question: How are the planning area and influence area defined for the nuclear facility, and do they encompass all zones
+    that may be subject to emergency mitigation measures, land-use restrictions, evacuation planning, or other protective
+    actions?
+  mode: map_reduce
+  classification_reasoning: The question requires a comprehensive analysis of multiple document sections defining planning
+    and influence areas, and how they relate to various protective actions, necessitating thorough cross-referencing to ensure
+    no critical information is missed.
+- question: What maps or spatial descriptions delineate the influence area for each category of nuclear facility incident
+    or accident, including radiological release, fire, explosion, and toxic release?
+  mode: map_reduce
+  classification_reasoning: The question requires a comprehensive analysis across multiple document sections to delineate
+    spatial descriptions for various types of nuclear facility incidents, where missing any relevant chunk could result in
+    an incomplete or inaccurate answer.
+- question: What criteria have been used to determine the boundaries of the influence area for each incident type, such as
+    dose thresholds, thermal radiation limits, or overpressure contours?
+  mode: basic
+  classification_reasoning: The question asks for specific criteria used to determine influence area boundaries, which can
+    be directly retrieved from relevant document sections.
+- question: Where is a consolidated summary of all findings from the nuclear facility Risk and Vulnerability Analysis presented,
+    integrating identified hazards, assessed risks, and their relative significance?
+  mode: map_reduce
+  classification_reasoning: The query demands a comprehensive integration of findings from multiple sections of a Risk and
+    Vulnerability Analysis, requiring thorough analysis across many document parts to ensure no critical information is missed.
+- question: What follow-up mitigation measures have been identified in the Risk and Vulnerability Analysis, and which parties
+    or organizations have been assigned responsibility for implementing each measure?
+  mode: map_reduce
+  classification_reasoning: The question requires a comprehensive analysis across multiple sections of the Risk and Vulnerability
+    Analysis document to identify all mitigation measures and their responsible parties, making it essential to process every
+    relevant chunk to ensure completeness.
+- question: How have the consequences of nuclear incidents been assessed in relation to the facility's proximity to operations
+    of national security significance, and which such operations have been identified within the influence area?
+  mode: map_reduce
+  classification_reasoning: The question requires a comprehensive analysis across multiple document sections to assess consequences
+    of nuclear incidents in relation to national security operations, with potential information spread across various parts
+    that must all be considered to provide a complete answer.
+- question: How have the consequences of nuclear incidents been assessed in relation to the facility's proximity to critical
+    infrastructure such as airports, ports, and hospitals, and what cascading or compounding impacts have been considered?
+  mode: map_reduce
+  classification_reasoning: The question requires a comprehensive analysis across multiple document sections to assess cascading
+    impacts of nuclear incidents on critical infrastructure, making it essential to evaluate information from various parts
+    of the documentation for a complete answer.

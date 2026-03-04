@@ -1,0 +1,113 @@
+# ============================================================================
+# questions-examples.yaml
+# Example formats for the batch query script (scripts/batch_query.py)
+#
+# Usage:
+#   python3 -m scripts.batch_query classify questions.yaml
+#   python3 -m scripts.batch_query run     questions.yaml
+#   python3 -m scripts.batch_query auto    questions.yaml
+# ============================================================================
+
+
+# --------------------------------------------------------------------------
+# EXAMPLE 1: Full format — settings block + questions with all fields
+# --------------------------------------------------------------------------
+# Use this when you want full control over the preset, output directory,
+# and per-question mode assignment.
+
+# settings:
+#   preset: Nuclear Technical          # Prompt preset (see config/settings.py)
+#                                      # Available: "Nuclear Technical", "DRB Expert"
+#   output_dir: results/               # Where JSON + CSV results are saved
+# questions:
+# - question: What are the primary containment boundary specifications?
+#   mode: basic                        # Explicitly set query mode
+#   classification_reasoning: Direct factual query best answered by vector search.
+# - question: How do PSR dose limits compare with PER environmental limits?
+#   mode: hybrid
+#   classification_reasoning: Compares requirements across two document sets.
+# - question: What are the consequences of a loss-of-coolant accident?
+#   mode: agentic
+#   classification_reasoning: Open-ended analysis requiring multi-step reasoning.
+
+
+# --------------------------------------------------------------------------
+# EXAMPLE 2: Let the classifier decide — omit mode fields
+# --------------------------------------------------------------------------
+# When mode is omitted, use `classify` or `auto` to let the LLM assign
+# the best mode for each question automatically.
+
+# settings:
+#   preset: Nuclear Technical
+#   output_dir: results/
+# questions:
+# - question: What are the primary containment boundary specifications?
+# - question: How do PSR dose limits compare with PER environmental limits?
+# - question: What are the consequences of a loss-of-coolant accident?
+# - question: Summarize all safety-related valve specifications across the documentation.
+# - question: What environmental monitoring requirements apply to the cooling water discharge?
+
+
+# --------------------------------------------------------------------------
+# EXAMPLE 3: Minimal — flat list of strings (no settings block)
+# --------------------------------------------------------------------------
+# The simplest possible format. Each item is just a question string.
+# The script will use default settings and auto-classify modes.
+
+# - What dose limits apply to workers during normal operations?
+# - What are the seismic design requirements for the reactor building?
+# - Compare the fire protection requirements in PSR Chapter 5 and PER Section 3.
+
+
+# --------------------------------------------------------------------------
+# EXAMPLE 4: Mixed — some questions pre-classified, some left for auto
+# --------------------------------------------------------------------------
+# You can mix classified and unclassified questions in the same file.
+# Running `classify` will only classify questions that have no mode set
+# (use --force to re-classify all).
+
+# settings:
+#   preset: DRB Expert
+#   output_dir: results/drb/
+# questions:
+# - question: What are the contractual specifications for valve leakage rates?
+#   mode: basic
+#   classification_reasoning: Direct factual lookup of a specific specification.
+# - question: Do the test reports contradict the supplier's compliance claims?
+# - question: What timeline of events led to the dispute over piping installation?
+#   mode: agentic
+#   classification_reasoning: Requires multi-step reasoning to reconstruct a timeline.
+# - question: Summarize all references to ASME standards across the case documents.
+
+
+# --------------------------------------------------------------------------
+# AVAILABLE MODES (6 total)
+# --------------------------------------------------------------------------
+# basic      - Simple vector search retrieval (factual lookups)
+# hybrid     - Combined vector + keyword search (comparisons, multi-doc queries)
+# agentic    - Multi-step LLM reasoning with iterative retrieval (complex analysis)
+# router     - LLM auto-selects between basic/hybrid/agentic at runtime
+# map_reduce - Every retrieved chunk gets individual LLM attention, then merged
+#              (thorough summaries, broad coverage where missing info is harmful)
+# parallel   - Multiple retrieval strategies run in parallel, results merged
+#              (very broad questions spanning multiple topic areas)
+#
+# If you use `classify` or `auto`, the LLM maps questions to modes as:
+#   factual_lookup  -> basic
+#   comparative     -> hybrid
+#   exploratory     -> agentic
+#   synthesis       -> map_reduce
+#   broad_coverage  -> parallel
+
+
+# ============================================================================
+# COPY-PASTE TEMPLATE — uncomment and fill in your questions
+# ============================================================================
+
+settings:
+  preset: Nuclear Technical
+  output_dir: results/
+questions:
+- question: Replace this with your first question?
+- question: Replace this with your second question?
+- question: Replace this with your third question?

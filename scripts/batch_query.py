@@ -2,15 +2,17 @@
 Batch query script — run multiple questions through the RAG pipeline.
 
 Workflow (two-step or combined):
-  1. classify: LLM analyzes each question and assigns the best query mode
-  2. run:      Execute classified questions and write results to JSON + CSV
-  3. auto:     Classify + run in one shot
+  1. classify: LLM analyzes each question and writes a *_classified.yaml file
+  2. run:      Execute questions from a (classified) YAML and write results to JSON + CSV
+  3. auto:     Classify + run in one shot (reads original, runs from classified copy)
+
+The original questions YAML is never modified.
 
 Usage:
-    python3 -m scripts.batch_query classify questions.yaml
+    python3 -m scripts.batch_query classify questions.yaml          # -> questions_classified.yaml
     python3 -m scripts.batch_query classify questions.yaml --force
-    python3 -m scripts.batch_query run questions.yaml
-    python3 -m scripts.batch_query run questions.yaml --mode hybrid -o results/
+    python3 -m scripts.batch_query run questions_classified.yaml
+    python3 -m scripts.batch_query run questions_classified.yaml --mode hybrid -o results/
     python3 -m scripts.batch_query run questions.yaml --stop-on-error
     python3 -m scripts.batch_query auto questions.yaml
     python3 -m scripts.batch_query auto questions.yaml -o results/ --stop-on-error
@@ -235,8 +237,13 @@ def classify_single(question: str, llm) -> dict:
         return {"category": "comparative", "reasoning": f"Fallback: {e}"}
 
 
+def classified_path_for(path: Path) -> Path:
+    """Return the classified output path: e.g. questions.yaml -> questions_classified.yaml."""
+    return path.with_stem(path.stem + "_classified")
+
+
 def cmd_classify(args):
-    """Classify all questions in the YAML and update the file with modes."""
+    """Classify all questions in the YAML and write a separate classified file."""
     path = Path(args.file)
     if not path.exists():
         console.print(f"[red]File not found: {path}[/red]")
@@ -281,8 +288,9 @@ def cmd_classify(args):
 
             progress.advance(task)
 
-    # Save updated YAML
-    save_batch_yaml(path, config)
+    # Save classified output to a separate file (never overwrite the original)
+    out_path = classified_path_for(path)
+    save_batch_yaml(out_path, config)
 
     # Print summary table
     mode_counts = {}
@@ -489,9 +497,10 @@ def cmd_auto(args):
 
     console.print("\n[bold]--- Classification complete, starting batch run ---[/bold]\n")
 
-    # Build a namespace that cmd_run expects (re-read the now-classified YAML)
+    # Point cmd_run at the classified file (original is never modified)
+    classified_file = str(classified_path_for(Path(args.file)))
     run_args = argparse.Namespace(
-        file=args.file,
+        file=classified_file,
         mode=args.mode,
         output_dir=args.output_dir,
         stop_on_error=args.stop_on_error,
